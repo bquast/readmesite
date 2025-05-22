@@ -9,7 +9,7 @@ You have a great `README.md` on your git repository that explains your project w
 *readmesite* fetches your `README.md` directly from the git repo, converts it to HTML, applies some basic styling, and outputs a self-contained static site (an `index.html` and a `style.css`) ready for deployment.
 
 ## Features
--   **zero-Config for Target Repo:** No need to add any files or conff•guration to the repository whose README you want to convert.
+-   **zero-Config for Target Repo:** No need to add any files, configuration, or CLI arguments/flags to the repository whose README.md you want to convert.
 -   **Simple CLI:** Easy-to-use command-line interface.
 -   **GitHub Integration:** Fetches READMEs directly from public GitHub repositories (tries `main` and then `master` branches).
 -   **Markdown Conversion:** Uses `marked` to convert Markdown to HTML.
