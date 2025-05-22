@@ -1,6 +1,8 @@
 # READMEsite
 
-**readmesite** is a simple command-line interface (CLI) tool that converts a git repository's `README.md` file into a clean, single-page static website. It's designed to be zero-configuration for the target repository and generates sites that are easy to deploy.
+**readmesite** is static site generator, turning the README.md of a repository into a standalone website; no files, configs or flags, just the command builds the site.
+
+It converts a git repository's `README.md` file into a clean, single-page static website. It's designed to be zero-configuration for the target repository and generates sites that are easy to deploy.
 
 ## The Problem
 You have a great `README.md` on your git repository that explains your project well. You want a quick and easy way to turn this existing documentation into a standalone webpage without setting up complex static site generators or needing to add configuration files to your project repository.
