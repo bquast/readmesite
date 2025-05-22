@@ -10,5 +10,5 @@ It converts a git repository's `README.md` file into a clean, single-page static
 To use `readmesite`, run the command:
 
 ```bash
-npx readmesite
+npx -y readmesite
 ```
