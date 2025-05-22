@@ -3,9 +3,11 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { marked } from 'marked';
+import { fileURLToPath } from 'url'; // For ES Module __dirname equivalent
 
 const DEFAULT_OUTPUT_DIR = 'public';
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
+const DEFAULT_OG_IMAGE_NAME = 'readmesite-og-default.png'; // Expected name of the default image
 
 const HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
@@ -18,12 +20,15 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     <meta property="og:url" content="{{OG_URL}}">
     <meta property="og:title" content="{{PAGE_TITLE}}">
     <meta property="og:description" content="View the README for the {{PAGE_TITLE}} repository.">
+    <meta property="og:image" content="{{OG_IMAGE_URL}}">
     <meta property="og:site_name" content="{{PAGE_TITLE}}">
 
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{OG_URL}}">
     <meta name="twitter:title" content="{{PAGE_TITLE}}">
     <meta name="twitter:description" content="View the README for the {{PAGE_TITLE}} repository.">
+    <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
+
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
 </head>
@@ -210,7 +215,7 @@ async function fetchReadmeContent(repoInfo) {
     }
 }
 
-async function generateSite(readmeContent, pageTitleBase, outputDir, repoOriginalIdentifier) {
+async function generateSite(readmeContent, pageTitleBase, outputDir, repoOriginalIdentifier, ogImageUrlCli) {
     console.log(`Generating site in directory: ${outputDir}`);
     try {
         await fs.mkdir(outputDir, { recursive: true });
@@ -231,9 +236,35 @@ async function generateSite(readmeContent, pageTitleBase, outputDir, repoOrigina
         }
     }
 
+    let finalOgImageUrl = '';
+    if (ogImageUrlCli) { // Image URL from --image flag
+        finalOgImageUrl = ogImageUrlCli;
+    } else {
+        // Copy default placeholder image and set its path
+        try {
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            // Assuming 'assets' is a sibling to 'index.js' in the installed package structure
+            const sourcePlaceholderPath = path.join(__dirname, 'assets', DEFAULT_OG_IMAGE_NAME);
+            
+            try {
+                await fs.access(sourcePlaceholderPath); // Check if file exists
+                const destPlaceholderPath = path.join(outputDir, DEFAULT_OG_IMAGE_NAME);
+                await fs.copyFile(sourcePlaceholderPath, destPlaceholderPath);
+                finalOgImageUrl = DEFAULT_OG_IMAGE_NAME; // Use relative path for HTML
+                console.log(`Using default OG image: ${DEFAULT_OG_IMAGE_NAME}`);
+            } catch (accessError) {
+                 console.warn(`Warning: Default OG image '${DEFAULT_OG_IMAGE_NAME}' not found at expected package location '${sourcePlaceholderPath}'. No default image will be set. Error: ${accessError.message}`);
+            }
+        } catch (e) { // Catch errors from fileURLToPath or path.dirname if import.meta.url is problematic
+            console.warn(`Warning: Could not determine path for default OG image. No default image will be set. Error: ${e.message}`);
+        }
+    }
+
     const finalHtml = HTML_TEMPLATE
         .replace(/{{PAGE_TITLE}}/g, sitePageTitle)
         .replace(/{{OG_URL}}/g, ogUrlValue)
+        .replace(/{{OG_IMAGE_URL}}/g, finalOgImageUrl)
         .replace('{{CONTENT}}', htmlContent);
 
     try {
@@ -249,23 +280,43 @@ async function generateSite(readmeContent, pageTitleBase, outputDir, repoOrigina
     } catch (error) {
         throw new Error(`Failed to write style.css: ${error.message}`);
     }
-} // THIS IS THE CORRECT END OF generateSite
+}
 
 async function main() {
-    const args = process.argv.slice(2);
-    const repoIdentifierArg = args[0];
-    const outputDirArg = args[1] || DEFAULT_OUTPUT_DIR;
+    const rawArgs = process.argv.slice(2);
+    let repoIdentifierArg = null;
+    let outputDirArg = DEFAULT_OUTPUT_DIR;
+    let imageUrlArg = null;
+
+    const imageFlagIndex = rawArgs.indexOf('--image');
+    if (imageFlagIndex !== -1) {
+        if (imageFlagIndex + 1 < rawArgs.length && !rawArgs[imageFlagIndex + 1].startsWith('--')) {
+            imageUrlArg = rawArgs[imageFlagIndex + 1];
+            rawArgs.splice(imageFlagIndex, 2);
+        } else {
+            console.warn("Warning: --image flag provided without a valid URL. Ignoring.");
+            rawArgs.splice(imageFlagIndex, 1);
+        }
+    }
+
+    if (rawArgs.length > 0) {
+        repoIdentifierArg = rawArgs[0];
+    }
+    if (rawArgs.length > 1) {
+        outputDirArg = rawArgs[1];
+    }
 
     if (!repoIdentifierArg) {
         console.error("Error: Repository identifier is required.\n");
-        console.log("Usage: readmesite <repository_identifier> [output_directory]\n");
+        console.log("Usage: readmesite <repository_identifier> [output_directory] [--image <image_url>]\n");
         console.log("<repository_identifier> can be:");
         console.log("  - A full repository URL (e.g., https://github.com/user/repo,");
         console.log("                           https://gitlab.com/user/repo,");
         console.log("                           https://your.gitlab.instance/user/repo)");
         console.log("  - 'username/repository' shorthand (attempts GitHub then GitLab.com)\n");
         console.log("[output_directory] is optional (defaults to 'public').\n");
-        console.log("Example: readmesite bquast/readmesite");
+        console.log("[--image <image_url>] is optional. Provide a full URL to an image for social media previews.\n");
+        console.log("Example: readmesite bquast/readmesite --image https://example.com/my-image.png");
         process.exit(1);
     }
 
@@ -277,11 +328,14 @@ async function main() {
              logIdentifier = `${repoInfo.user}/${repoInfo.repoName}`;
         }
         console.log(`Processing repository: ${logIdentifier} (Provider type determined: ${repoInfo.type})`);
+        if (imageUrlArg) {
+            console.log(`Using custom image for social previews: ${imageUrlArg}`);
+        }
 
         const readmeContent = await fetchReadmeContent(repoInfo);
         console.log("README.md fetched successfully.");
 
-        await generateSite(readmeContent, repoInfo.repoName, path.resolve(outputDirArg), repoInfo.originalIdentifier);
+        await generateSite(readmeContent, repoInfo.repoName, path.resolve(outputDirArg), repoInfo.originalIdentifier, imageUrlArg);
 
         console.log("\n✅ Site generation complete!");
         console.log(`\nStatic site files are located in: ${path.resolve(outputDirArg)}`);
@@ -292,7 +346,7 @@ async function main() {
         console.log("   - Output directory: Specify the name of your output directory (e.g., 'public').");
         console.log("OR");
         console.log("1. Install Wrangler CLI: npm install -g wrangler");
-        console.log(`2. Navigate to your project directory: cd /path/to/your/project`); // This line may need adjustment if not in project root.
+        console.log(`2. Navigate to your project directory: cd /path/to/your/project`);
         console.log(`3. Deploy directly: wrangler pages deploy ${path.basename(path.resolve(outputDirArg))}`);
         console.log("OR");
         console.log("1. Go to your Cloudflare dashboard -> Pages.");
