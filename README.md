@@ -12,3 +12,5 @@ To use `readmesite`, run the command:
 ```bash
 npx -y readmesite
 ```
+
+That's all! Just running the command will create your standalone website.
