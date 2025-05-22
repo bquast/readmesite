@@ -1,7 +1,7 @@
 {
   "name": "readmesite",
-  "version": "1.2.0",
-  "description": "A repository's README.md to a static website without config or files.",
+  "version": "1.4.0",
+  "description": "Static website from the repository README.md, no files, configs or flags.",
   "type": "module",
   "main": "index.js",
   "bin": {
