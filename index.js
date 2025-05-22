@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'; // For ES Module __dirname equivalent
 
 const DEFAULT_OUTPUT_DIR = 'public';
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
-const DEFAULT_OG_IMAGE_NAME = 'readmesite-og-default.png'; // Expected name of the default image
+const DEFAULT_IMAGE_FILENAME = 'readmesite-og-default.png'; // Your pixel art book image
 
 const HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
@@ -30,7 +30,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
 
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
+    <link rel="icon" href="{{FAVICON_URL}}" type="image/png">
 </head>
 <body>
     <main class="container">
@@ -51,168 +51,39 @@ body {
     padding: 0;
     background-color: #f6f8fa;
 }
-.container {
-    max-width: 800px;
-    margin: 30px auto;
-    padding: 20px 40px;
-    background-color: #ffffff;
-    border: 1px solid #d1d5da;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-h1, h2, h3, h4, h5, h6 {
-    margin-top: 24px;
-    margin-bottom: 16px;
-    font-weight: 600;
-    line-height: 1.25;
-    border-bottom: 1px solid #eaecef;
-    padding-bottom: .3em;
-}
-h1 { font-size: 2em; }
-h2 { font-size: 1.5em; }
-h3 { font-size: 1.25em; }
-h4 { font-size: 1em; }
-h5 { font-size: .875em; }
-h6 { font-size: .85em; color: #6a737d; }
-p { margin-top: 0; margin-bottom: 16px; }
-ul, ol { margin-top: 0; margin-bottom: 16px; padding-left: 2em; }
-a { color: #0366d6; text-decoration: none; }
-a:hover { text-decoration: underline; }
-code {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-    font-size: 85%;
-    background-color: rgba(27,31,35,.05);
-    border-radius: 3px;
-    padding: .2em .4em;
-    margin: 0;
-}
-pre {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-    font-size: 85%;
-    line-height: 1.45;
-    background-color: #f6f8fa;
-    border-radius: 3px;
-    padding: 16px;
-    overflow: auto;
-    margin-bottom: 16px;
-}
-pre code {
-    font-size: 100%; padding: 0; margin: 0; background-color: transparent; border: 0;
-    display: inline; max-width: auto; overflow: visible; line-height: inherit; word-wrap: normal;
-}
-img { max-width: 100%; height: auto; box-sizing: border-box; margin-top: 16px; margin-bottom: 16px; }
-blockquote { margin: 0 0 16px 0; padding: 0 1em; color: #6a737d; border-left: .25em solid #dfe2e5; }
-table { border-collapse: collapse; margin-bottom: 16px; width: 100%; display: block; overflow: auto; }
-th, td { border: 1px solid #dfe2e5; padding: 6px 13px; }
-tr { background-color: #fff; border-top: 1px solid #c6cbd1; }
-tr:nth-child(2n) { background-color: #f6f8fa; }
-hr { height: .25em; padding: 0; margin: 24px 0; background-color: #e1e4e8; border: 0; }
-footer {
-    text-align: center; margin-top: 40px; padding-top: 20px;
-    border-top: 1px solid #eaecef; font-size: 0.9em; color: #586069;
-}
-footer a { color: #0366d6; }
+/* ... (rest of CSS styles remain the same) ... */
+.container {max-width: 800px; margin: 30px auto; padding: 20px 40px; background-color: #ffffff; border: 1px solid #d1d5da; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);}
+h1,h2,h3,h4,h5,h6 {margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; border-bottom: 1px solid #eaecef; padding-bottom: .3em;}
+h1 {font-size: 2em;} h2 {font-size: 1.5em;} h3 {font-size: 1.25em;} h4 {font-size: 1em;} h5 {font-size: .875em;} h6 {font-size: .85em; color: #6a737d;}
+p {margin-top:0; margin-bottom:16px;} ul,ol {margin-top:0; margin-bottom:16px; padding-left:2em;}
+a {color:#0366d6; text-decoration:none;} a:hover {text-decoration:underline;}
+code {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; background-color:rgba(27,31,35,.05); border-radius:3px; padding:.2em .4em; margin:0;}
+pre {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; line-height:1.45; background-color:#f6f8fa; border-radius:3px; padding:16px; overflow:auto; margin-bottom:16px;}
+pre code {font-size:100%; padding:0; margin:0; background-color:transparent; border:0; display:inline; max-width:auto; overflow:visible; line-height:inherit; word-wrap:normal;}
+img {max-width:100%; height:auto; box-sizing:border-box; margin-top:16px; margin-bottom:16px;}
+blockquote {margin:0 0 16px 0; padding:0 1em; color:#6a737d; border-left:.25em solid #dfe2e5;}
+table {border-collapse:collapse; margin-bottom:16px; width:100%; display:block; overflow:auto;}
+th,td {border:1px solid #dfe2e5; padding:6px 13px;}
+tr {background-color:#fff; border-top:1px solid #c6cbd1;} tr:nth-child(2n) {background-color:#f6f8fa;}
+hr {height:.25em; padding:0; margin:24px 0; background-color:#e1e4e8; border:0;}
+footer {text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid #eaecef; font-size:.9em; color:#586069;}
+footer a {color:#0366d6;}
 `;
 
 async function parseRepoIdentifier(identifier) {
-    if (!identifier) {
-        throw new Error("Repository identifier argument is missing.");
-    }
-    try {
-        const url = new URL(identifier);
-        const hostname = url.hostname.toLowerCase();
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        if (pathParts.length < 2) {
-             throw new Error(`URL path does not seem to contain enough segments for a repository: ${url.pathname}`);
-        }
-        if (hostname === 'github.com') {
-            return { type: 'github', host: hostname, user: pathParts[0], repoName: pathParts[1], originalIdentifier: identifier };
-        } else if (hostname === 'gitlab.com') {
-            const repoName = pathParts[pathParts.length - 1];
-            const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/');
-            return { type: 'gitlab', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier };
-        } else if (url.protocol === 'https:') {
-            const repoName = pathParts[pathParts.length - 1];
-            const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/');
-            console.warn(`Processing unknown host '${hostname}' using GitLab-like URL pattern for raw files.`);
-            return { type: 'unknown_gitlab_like', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier };
-        }
-    } catch (e) {
-        if (!(e instanceof TypeError && e.message.includes("Invalid URL"))) {
-             console.warn(`URL parsing attempt failed for '${identifier}': ${e.message}. Will try as 'user/repo'.`);
-        }
-    }
-    if (identifier.includes('://')) {
-        throw new Error(`Invalid repository identifier: '${identifier}'. Full URLs must be valid. For 'user/repo' shorthand, do not include protocol.`);
-    }
-    const parts = identifier.split('/');
-    if (parts.length === 2 && parts[0] && parts[1] && !parts[0].includes('.') && !parts[1].includes('.')) {
-        return { type: 'user_slash_repo', user: parts[0], repoName: parts[1], originalIdentifier: identifier };
-    }
-    throw new Error(`Could not parse repository identifier: '${identifier}'. Please use 'username/repository' format or a full HTTPS URL.`);
+    // ... (this function remains the same as the previous complete version)
+    if (!identifier) { throw new Error("Repository identifier argument is missing."); }
+    try { const url = new URL(identifier); const hostname = url.hostname.toLowerCase(); const pathParts = url.pathname.split('/').filter(Boolean); if (pathParts.length < 2) { throw new Error(`URL path does not seem to contain enough segments for a repository: ${url.pathname}`); } if (hostname === 'github.com') { return { type: 'github', host: hostname, user: pathParts[0], repoName: pathParts[1], originalIdentifier: identifier }; } else if (hostname === 'gitlab.com') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); return { type: 'gitlab', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } else if (url.protocol === 'https:') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); console.warn(`Processing unknown host '${hostname}' using GitLab-like URL pattern for raw files.`); return { type: 'unknown_gitlab_like', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } } catch (e) { if (!(e instanceof TypeError && e.message.includes("Invalid URL"))) { console.warn(`URL parsing attempt failed for '${identifier}': ${e.message}. Will try as 'user/repo'.`); } } if (identifier.includes('://')) { throw new Error(`Invalid repository identifier: '${identifier}'. Full URLs must be valid. For 'user/repo' shorthand, do not include protocol.`); } const parts = identifier.split('/'); if (parts.length === 2 && parts[0] && parts[1] && !parts[0].includes('.') && !parts[1].includes('.')) { return { type: 'user_slash_repo', user: parts[0], repoName: parts[1], originalIdentifier: identifier }; } throw new Error(`Could not parse repository identifier: '${identifier}'. Please use 'username/repository' format or a full HTTPS URL.`);
 }
 
 async function tryFetchForProvider(providerRepoInfo, branches, filePath) {
-    let lastBranchError = null;
-    for (const branch of branches) {
-        let readmeUrl;
-        const repoDisplayPath = providerRepoInfo.type === 'github' ? `${providerRepoInfo.user}/${providerRepoInfo.repoName}` : `${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}`;
-        if (providerRepoInfo.type === 'github') {
-            readmeUrl = `https://raw.githubusercontent.com/${providerRepoInfo.user}/${providerRepoInfo.repoName}/${branch}/${filePath}`;
-        } else if (providerRepoInfo.type === 'gitlab' || providerRepoInfo.type === 'unknown_gitlab_like') {
-            readmeUrl = `https://${providerRepoInfo.host}/${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}/-/raw/${branch}/${filePath}`;
-        } else {
-            return { content: null, error: new Error(`Internal error: Unsupported provider type: ${providerRepoInfo.type}`) };
-        }
-        console.log(`Attempting: ${readmeUrl}`);
-        try {
-            const response = await fetch(readmeUrl);
-            if (response.ok) {
-                return { content: await response.text(), error: null };
-            }
-            if (response.status === 404) {
-                lastBranchError = new Error(`${filePath} not found on branch '${branch}' for ${repoDisplayPath} at ${providerRepoInfo.host}`);
-                console.warn(lastBranchError.message);
-            } else {
-                throw new Error(`Failed to fetch ${filePath} from ${readmeUrl}. Status: ${response.status} ${response.statusText}`);
-            }
-        } catch (fetchError) {
-            lastBranchError = new Error(`Network/fetch error for ${readmeUrl}: ${fetchError.message}`);
-            console.warn(lastBranchError.message);
-            return { content: null, error: lastBranchError };
-        }
-    }
-    return { content: null, error: lastBranchError || new Error(`${filePath} not found on any attempted branch for ${repoDisplayPath} at ${providerRepoInfo.host}.`) };
+    // ... (this function remains the same as the previous complete version)
+    let lastBranchError = null; for (const branch of branches) { let readmeUrl; const repoDisplayPath = providerRepoInfo.type === 'github' ? `${providerRepoInfo.user}/${providerRepoInfo.repoName}` : `${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}`; if (providerRepoInfo.type === 'github') { readmeUrl = `https://raw.githubusercontent.com/${providerRepoInfo.user}/${providerRepoInfo.repoName}/${branch}/${filePath}`; } else if (providerRepoInfo.type === 'gitlab' || providerRepoInfo.type === 'unknown_gitlab_like') { readmeUrl = `https://${providerRepoInfo.host}/${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}/-/raw/${branch}/${filePath}`; } else { return { content: null, error: new Error(`Internal error: Unsupported provider type: ${providerRepoInfo.type}`) }; } console.log(`Attempting: ${readmeUrl}`); try { const response = await fetch(readmeUrl); if (response.ok) { return { content: await response.text(), error: null }; } if (response.status === 404) { lastBranchError = new Error(`${filePath} not found on branch '${branch}' for ${repoDisplayPath} at ${providerRepoInfo.host}`); console.warn(lastBranchError.message); } else { throw new Error(`Failed to fetch ${filePath} from ${readmeUrl}. Status: ${response.status} ${response.statusText}`); } } catch (fetchError) { lastBranchError = new Error(`Network/fetch error for ${readmeUrl}: ${fetchError.message}`); console.warn(lastBranchError.message); return { content: null, error: lastBranchError }; } } return { content: null, error: lastBranchError || new Error(`${filePath} not found on any attempted branch for ${repoDisplayPath} at ${providerRepoInfo.host}.`) };
 }
 
 async function fetchReadmeContent(repoInfo) {
-    const filePath = 'README.md';
-    if (repoInfo.type === 'user_slash_repo') {
-        console.log(`Input '${repoInfo.originalIdentifier}' is 'username/repository' shorthand.`);
-        console.log("Attempting to resolve on GitHub (github.com)...");
-        const githubInfo = {
-            type: 'github', host: 'github.com', user: repoInfo.user, repoName: repoInfo.repoName,
-            originalIdentifier: repoInfo.originalIdentifier
-        };
-        let result = await tryFetchForProvider(githubInfo, CHECK_BRANCHES_ORDER, filePath);
-        if (result.content) return result.content;
-        console.warn(`GitHub attempt for '${repoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`);
-
-        console.log("Attempting to resolve on GitLab (gitlab.com)...");
-        const gitlabInfo = {
-            type: 'gitlab', host: 'gitlab.com', userOrGroupPath: repoInfo.user, repoName: repoInfo.repoName,
-            originalIdentifier: repoInfo.originalIdentifier
-        };
-        result = await tryFetchForProvider(gitlabInfo, CHECK_BRANCHES_ORDER, filePath);
-        if (result.content) return result.content;
-        console.warn(`GitLab.com attempt for '${repoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`);
-        
-        throw new Error(`Could not resolve '${repoInfo.originalIdentifier}' on GitHub or GitLab.com, or ${filePath} not found on any tried branch.`);
-    } else {
-        const result = await tryFetchForProvider(repoInfo, CHECK_BRANCHES_ORDER, filePath);
-        if (result.content) return result.content;
-        throw result.error || new Error(`Could not find ${filePath} for '${repoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`);
-    }
+    // ... (this function remains the same as the previous complete version)
+    const filePath = 'README.md'; if (repoInfo.type === 'user_slash_repo') { console.log(`Input '${repoInfo.originalIdentifier}' is 'username/repository' shorthand.`); console.log("Attempting to resolve on GitHub (github.com)..."); const githubInfo = { type: 'github', host: 'github.com', user: repoInfo.user, repoName: repoInfo.repoName, originalIdentifier: repoInfo.originalIdentifier }; let result = await tryFetchForProvider(githubInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) return result.content; console.warn(`GitHub attempt for '${repoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); console.log("Attempting to resolve on GitLab (gitlab.com)..."); const gitlabInfo = { type: 'gitlab', host: 'gitlab.com', userOrGroupPath: repoInfo.user, repoName: repoInfo.repoName, originalIdentifier: repoInfo.originalIdentifier }; result = await tryFetchForProvider(gitlabInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) return result.content; console.warn(`GitLab.com attempt for '${repoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); throw new Error(`Could not resolve '${repoInfo.originalIdentifier}' on GitHub or GitLab.com, or ${filePath} not found on any tried branch.`); } else { const result = await tryFetchForProvider(repoInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) return result.content; throw result.error || new Error(`Could not find ${filePath} for '${repoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`); }
 }
 
 async function generateSite(readmeContent, pageTitleBase, outputDir, repoOriginalIdentifier, ogImageUrlCli) {
@@ -229,42 +100,45 @@ async function generateSite(readmeContent, pageTitleBase, outputDir, repoOrigina
     let ogUrlValue = '';
     if (repoOriginalIdentifier && (repoOriginalIdentifier.startsWith('https://') || repoOriginalIdentifier.startsWith('http://'))) {
         try {
-            new URL(repoOriginalIdentifier); // Validate if it's a proper URL
+            new URL(repoOriginalIdentifier);
             ogUrlValue = repoOriginalIdentifier;
         } catch (e) {
             console.warn(`Original identifier '${repoOriginalIdentifier}' is not a valid URL for og:url. Omitting.`);
         }
     }
 
-    let finalOgImageUrl = '';
-    if (ogImageUrlCli) { // Image URL from --image flag
-        finalOgImageUrl = ogImageUrlCli;
-    } else {
-        // Copy default placeholder image and set its path
-        try {
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            // Assuming 'assets' is a sibling to 'index.js' in the installed package structure
-            const sourcePlaceholderPath = path.join(__dirname, 'assets', DEFAULT_OG_IMAGE_NAME);
-            
-            try {
-                await fs.access(sourcePlaceholderPath); // Check if file exists
-                const destPlaceholderPath = path.join(outputDir, DEFAULT_OG_IMAGE_NAME);
-                await fs.copyFile(sourcePlaceholderPath, destPlaceholderPath);
-                finalOgImageUrl = DEFAULT_OG_IMAGE_NAME; // Use relative path for HTML
-                console.log(`Using default OG image: ${DEFAULT_OG_IMAGE_NAME}`);
-            } catch (accessError) {
-                 console.warn(`Warning: Default OG image '${DEFAULT_OG_IMAGE_NAME}' not found at expected package location '${sourcePlaceholderPath}'. No default image will be set. Error: ${accessError.message}`);
-            }
-        } catch (e) { // Catch errors from fileURLToPath or path.dirname if import.meta.url is problematic
-            console.warn(`Warning: Could not determine path for default OG image. No default image will be set. Error: ${e.message}`);
-        }
+    let faviconPathInHtml = '';
+    let ogImageMetaTagUrl = '';
+
+    // Attempt to copy the default image for use as favicon AND as default OG image
+    try {
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const sourceDefaultImagePath = path.join(__dirname, 'assets', DEFAULT_IMAGE_FILENAME);
+        
+        await fs.access(sourceDefaultImagePath); // Check if file exists in package assets
+        const destDefaultImagePath = path.join(outputDir, DEFAULT_IMAGE_FILENAME);
+        await fs.copyFile(sourceDefaultImagePath, destDefaultImagePath);
+        
+        faviconPathInHtml = DEFAULT_IMAGE_FILENAME; // Favicon will use this local default file
+        ogImageMetaTagUrl = DEFAULT_IMAGE_FILENAME; // Default OG image is also this local file
+        console.log(`Using default image for favicon and as fallback OG image: ${DEFAULT_IMAGE_FILENAME}`);
+    } catch (e) {
+        console.warn(`Warning: Could not copy or access default image '${DEFAULT_IMAGE_FILENAME}'. Favicon and default OG image may be missing. Error: ${e.message}`);
     }
+
+    // If a custom image URL was provided via CLI, it overrides the OG image
+    if (ogImageUrlCli) {
+        ogImageMetaTagUrl = ogImageUrlCli; // Custom URL from --image flag takes precedence for OG tags
+        console.log(`Using custom image for OG/Twitter previews: ${ogImageUrlCli}`);
+    }
+
 
     const finalHtml = HTML_TEMPLATE
         .replace(/{{PAGE_TITLE}}/g, sitePageTitle)
         .replace(/{{OG_URL}}/g, ogUrlValue)
-        .replace(/{{OG_IMAGE_URL}}/g, finalOgImageUrl)
+        .replace(/{{FAVICON_URL}}/g, faviconPathInHtml) // Use the (potentially empty) path for the copied default image
+        .replace(/{{OG_IMAGE_URL}}/g, ogImageMetaTagUrl) // Use custom URL or default image name or ''
         .replace('{{CONTENT}}', htmlContent);
 
     try {
@@ -283,53 +157,18 @@ async function generateSite(readmeContent, pageTitleBase, outputDir, repoOrigina
 }
 
 async function main() {
-    const rawArgs = process.argv.slice(2);
-    let repoIdentifierArg = null;
-    let outputDirArg = DEFAULT_OUTPUT_DIR;
-    let imageUrlArg = null;
-
-    const imageFlagIndex = rawArgs.indexOf('--image');
-    if (imageFlagIndex !== -1) {
-        if (imageFlagIndex + 1 < rawArgs.length && !rawArgs[imageFlagIndex + 1].startsWith('--')) {
-            imageUrlArg = rawArgs[imageFlagIndex + 1];
-            rawArgs.splice(imageFlagIndex, 2);
-        } else {
-            console.warn("Warning: --image flag provided without a valid URL. Ignoring.");
-            rawArgs.splice(imageFlagIndex, 1);
-        }
-    }
-
-    if (rawArgs.length > 0) {
-        repoIdentifierArg = rawArgs[0];
-    }
-    if (rawArgs.length > 1) {
-        outputDirArg = rawArgs[1];
-    }
-
-    if (!repoIdentifierArg) {
-        console.error("Error: Repository identifier is required.\n");
-        console.log("Usage: readmesite <repository_identifier> [output_directory] [--image <image_url>]\n");
-        console.log("<repository_identifier> can be:");
-        console.log("  - A full repository URL (e.g., https://github.com/user/repo,");
-        console.log("                           https://gitlab.com/user/repo,");
-        console.log("                           https://your.gitlab.instance/user/repo)");
-        console.log("  - 'username/repository' shorthand (attempts GitHub then GitLab.com)\n");
-        console.log("[output_directory] is optional (defaults to 'public').\n");
-        console.log("[--image <image_url>] is optional. Provide a full URL to an image for social media previews.\n");
-        console.log("Example: readmesite bquast/readmesite --image https://example.com/my-image.png");
-        process.exit(1);
-    }
+    // ... (main function argument parsing remains the same as the previous complete version)
+    const rawArgs = process.argv.slice(2); let repoIdentifierArg = null; let outputDirArg = DEFAULT_OUTPUT_DIR; let imageUrlArg = null; const imageFlagIndex = rawArgs.indexOf('--image'); if (imageFlagIndex !== -1) { if (imageFlagIndex + 1 < rawArgs.length && !rawArgs[imageFlagIndex + 1].startsWith('--')) { imageUrlArg = rawArgs[imageFlagIndex + 1]; rawArgs.splice(imageFlagIndex, 2); } else { console.warn("Warning: --image flag provided without a valid URL. Ignoring."); rawArgs.splice(imageFlagIndex, 1); } } if (rawArgs.length > 0) repoIdentifierArg = rawArgs[0]; if (rawArgs.length > 1) outputDirArg = rawArgs[1]; if (!repoIdentifierArg) { console.error("Error: Repository identifier is required.\n"); console.log("Usage: readmesite <repository_identifier> [output_directory] [--image <image_url>]\n"); console.log("<repository_identifier> can be:"); console.log("  - A full repository URL (e.g., https://github.com/user/repo,"); console.log("                           https://gitlab.com/user/repo,"); console.log("                           https://your.gitlab.instance/user/repo)"); console.log("  - 'username/repository' shorthand (attempts GitHub then GitLab.com)\n"); console.log("[output_directory] is optional (defaults to 'public').\n"); console.log("[--image <image_url>] is optional. Provide a full URL to an image for social media previews.\n"); console.log("Example: readmesite bquast/readmesite --image https://example.com/my-image.png"); process.exit(1); }
 
     try {
         const repoInfo = await parseRepoIdentifier(repoIdentifierArg);
-        
         let logIdentifier = repoInfo.originalIdentifier;
         if (repoInfo.type === 'user_slash_repo') {
              logIdentifier = `${repoInfo.user}/${repoInfo.repoName}`;
         }
         console.log(`Processing repository: ${logIdentifier} (Provider type determined: ${repoInfo.type})`);
         if (imageUrlArg) {
-            console.log(`Using custom image for social previews: ${imageUrlArg}`);
+            console.log(`Using custom image for OG/Twitter previews: ${imageUrlArg}`);
         }
 
         const readmeContent = await fetchReadmeContent(repoInfo);
@@ -339,18 +178,9 @@ async function main() {
 
         console.log("\n✅ Site generation complete!");
         console.log(`\nStatic site files are located in: ${path.resolve(outputDirArg)}`);
-        console.log("\n🚀 To deploy to Cloudflare Pages (example):");
-        console.log("1. Push the output directory (e.g., 'public') to a new or existing Git repository.");
-        console.log("2. Connect that repository to Cloudflare Pages.");
-        console.log("   - Build command: Leave blank or use a command like 'echo No build needed'.");
-        console.log("   - Output directory: Specify the name of your output directory (e.g., 'public').");
-        console.log("OR");
-        console.log("1. Install Wrangler CLI: npm install -g wrangler");
-        console.log(`2. Navigate to your project directory: cd /path/to/your/project`);
-        console.log(`3. Deploy directly: wrangler pages deploy ${path.basename(path.resolve(outputDirArg))}`);
-        console.log("OR");
-        console.log("1. Go to your Cloudflare dashboard -> Pages.");
-        console.log(`2. Choose 'Upload assets' and drag & drop the '${path.basename(path.resolve(outputDirArg))}' directory.`);
+        // ... (deployment instructions remain the same)
+        console.log("\n🚀 To deploy to Cloudflare Pages (example):"); console.log("1. Push the output directory (e.g., 'public') to a new or existing Git repository."); console.log("2. Connect that repository to Cloudflare Pages."); console.log("   - Build command: Leave blank or use a command like 'echo No build needed'."); console.log("   - Output directory: Specify the name of your output directory (e.g., 'public')."); console.log("OR"); console.log("1. Install Wrangler CLI: npm install -g wrangler"); console.log(`2. Navigate to your project directory: cd /path/to/your/project`); console.log(`3. Deploy directly: wrangler pages deploy ${path.basename(path.resolve(outputDirArg))}`); console.log("OR"); console.log("1. Go to your Cloudflare dashboard -> Pages."); console.log(`2. Choose 'Upload assets' and drag & drop the '${path.basename(path.resolve(outputDirArg))}' directory.`);
+
 
     } catch (error) {
         console.error(`\n❌ Error: ${error.message}`);
