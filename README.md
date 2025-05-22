@@ -40,7 +40,7 @@ readmesite <URL>
 
 If you want to contribute or work on `readmesite`:
 
-1. Clone this repository.
+1. Clone the repository: https://github.com/bquast/readmesite
 2. Navigate to the directory: `cd readmesite`
 3. Install dependencies: `npm install`    
 4. Make your changes to `index.js` as or other files.
