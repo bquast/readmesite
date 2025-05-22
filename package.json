@@ -1,6 +1,6 @@
 {
   "name": "readmesite",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Static website from the repository README.md, no files, configs or flags.",
   "type": "module",
   "main": "index.js",
