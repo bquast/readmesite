@@ -12,7 +12,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{TITLE}}</title>
+    <title>{{PAGE_TITLE}}</title>
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{OG_URL}}">
@@ -46,7 +46,6 @@ body {
     padding: 0;
     background-color: #f6f8fa;
 }
-/* ... (rest of CSS styles remain the same as previous version) ... */
 .container {
     max-width: 800px;
     margin: 30px auto;
@@ -111,12 +110,11 @@ footer a { color: #0366d6; }
 `;
 
 async function parseRepoIdentifier(identifier) {
-    // ... (parseRepoIdentifier remains the same as previous version)
     if (!identifier) {
         throw new Error("Repository identifier argument is missing.");
     }
     try {
-        const url = new URL(identifier); 
+        const url = new URL(identifier);
         const hostname = url.hostname.toLowerCase();
         const pathParts = url.pathname.split('/').filter(Boolean);
         if (pathParts.length < 2) {
@@ -150,15 +148,14 @@ async function parseRepoIdentifier(identifier) {
 }
 
 async function tryFetchForProvider(providerRepoInfo, branches, filePath) {
-    // ... (tryFetchForProvider remains the same as previous version)
     let lastBranchError = null;
     for (const branch of branches) {
         let readmeUrl;
-        const repoDisplayPath = providerRepoInfo.type === 'github' ? `<span class="math-inline">\{providerRepoInfo\.user\}/</span>{providerRepoInfo.repoName}` : `<span class="math-inline">\{providerRepoInfo\.userOrGroupPath\}/</span>{providerRepoInfo.repoName}`;
+        const repoDisplayPath = providerRepoInfo.type === 'github' ? `${providerRepoInfo.user}/${providerRepoInfo.repoName}` : `${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}`;
         if (providerRepoInfo.type === 'github') {
-            readmeUrl = `https://raw.githubusercontent.com/<span class="math-inline">\{providerRepoInfo\.user\}/</span>{providerRepoInfo.repoName}/<span class="math-inline">\{branch\}/</span>{filePath}`;
+            readmeUrl = `https://raw.githubusercontent.com/${providerRepoInfo.user}/${providerRepoInfo.repoName}/${branch}/${filePath}`;
         } else if (providerRepoInfo.type === 'gitlab' || providerRepoInfo.type === 'unknown_gitlab_like') {
-            readmeUrl = `https://<span class="math-inline">\{providerRepoInfo\.host\}/</span>{providerRepoInfo.userOrGroupPath}/<span class="math-inline">\{providerRepoInfo\.repoName\}/\-/raw/</span>{branch}/${filePath}`;
+            readmeUrl = `https://${providerRepoInfo.host}/${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}/-/raw/${branch}/${filePath}`;
         } else {
             return { content: null, error: new Error(`Internal error: Unsupported provider type: ${providerRepoInfo.type}`) };
         }
@@ -169,22 +166,21 @@ async function tryFetchForProvider(providerRepoInfo, branches, filePath) {
                 return { content: await response.text(), error: null };
             }
             if (response.status === 404) {
-                lastBranchError = new Error(`<span class="math-inline">\{filePath\} not found on branch '</span>{branch}' for ${repoDisplayPath} at ${providerRepoInfo.host}`);
-                console.warn(lastBranchError.message); 
+                lastBranchError = new Error(`${filePath} not found on branch '${branch}' for ${repoDisplayPath} at ${providerRepoInfo.host}`);
+                console.warn(lastBranchError.message);
             } else {
                 throw new Error(`Failed to fetch ${filePath} from ${readmeUrl}. Status: ${response.status} ${response.statusText}`);
             }
-        } catch (fetchError) { 
+        } catch (fetchError) {
             lastBranchError = new Error(`Network/fetch error for ${readmeUrl}: ${fetchError.message}`);
             console.warn(lastBranchError.message);
-            return { content: null, error: lastBranchError }; 
+            return { content: null, error: lastBranchError };
         }
     }
     return { content: null, error: lastBranchError || new Error(`${filePath} not found on any attempted branch for ${repoDisplayPath} at ${providerRepoInfo.host}.`) };
 }
 
 async function fetchReadmeContent(repoInfo) {
-    // ... (fetchReadmeContent remains the same as previous version)
     const filePath = 'README.md';
     if (repoInfo.type === 'user_slash_repo') {
         console.log(`Input '${repoInfo.originalIdentifier}' is 'username/repository' shorthand.`);
@@ -210,11 +206,11 @@ async function fetchReadmeContent(repoInfo) {
     } else {
         const result = await tryFetchForProvider(repoInfo, CHECK_BRANCHES_ORDER, filePath);
         if (result.content) return result.content;
-        throw result.error || new Error(`Could not find <span class="math-inline">\{filePath\} for '</span>{repoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`);
+        throw result.error || new Error(`Could not find ${filePath} for '${repoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`);
     }
 }
 
-async function generateSite(readmeContent, pageTitleBase, outputDir, repoOriginalIdentifier) { // Added repoOriginalIdentifier
+async function generateSite(readmeContent, pageTitleBase, outputDir, repoOriginalIdentifier) {
     console.log(`Generating site in directory: ${outputDir}`);
     try {
         await fs.mkdir(outputDir, { recursive: true });
@@ -223,16 +219,92 @@ async function generateSite(readmeContent, pageTitleBase, outputDir, repoOrigina
     }
 
     const htmlContent = marked.parse(readmeContent);
-    const sitePageTitle = pageTitleBase; // This is repoInfo.repoName
+    const sitePageTitle = pageTitleBase;
 
     let ogUrlValue = '';
-    // Use the original identifier if it's a full, valid URL for og:url
     if (repoOriginalIdentifier && (repoOriginalIdentifier.startsWith('https://') || repoOriginalIdentifier.startsWith('http://'))) {
         try {
             new URL(repoOriginalIdentifier); // Validate if it's a proper URL
             ogUrlValue = repoOriginalIdentifier;
         } catch (e) {
-            // Not a valid URL, leave ogUrlValue empty or use a fallback
             console.warn(`Original identifier '${repoOriginalIdentifier}' is not a valid URL for og:url. Omitting.`);
         }
     }
+
+    const finalHtml = HTML_TEMPLATE
+        .replace(/{{PAGE_TITLE}}/g, sitePageTitle)
+        .replace(/{{OG_URL}}/g, ogUrlValue)
+        .replace('{{CONTENT}}', htmlContent);
+
+    try {
+        await fs.writeFile(path.join(outputDir, 'index.html'), finalHtml);
+        console.log(`Successfully wrote index.html`);
+    } catch (error) {
+        throw new Error(`Failed to write index.html: ${error.message}`);
+    }
+
+    try {
+        await fs.writeFile(path.join(outputDir, 'style.css'), CSS_STYLES);
+        console.log(`Successfully wrote style.css`);
+    } catch (error) {
+        throw new Error(`Failed to write style.css: ${error.message}`);
+    }
+} // THIS IS THE CORRECT END OF generateSite
+
+async function main() {
+    const args = process.argv.slice(2);
+    const repoIdentifierArg = args[0];
+    const outputDirArg = args[1] || DEFAULT_OUTPUT_DIR;
+
+    if (!repoIdentifierArg) {
+        console.error("Error: Repository identifier is required.\n");
+        console.log("Usage: readmesite <repository_identifier> [output_directory]\n");
+        console.log("<repository_identifier> can be:");
+        console.log("  - A full repository URL (e.g., https://github.com/user/repo,");
+        console.log("                           https://gitlab.com/user/repo,");
+        console.log("                           https://your.gitlab.instance/user/repo)");
+        console.log("  - 'username/repository' shorthand (attempts GitHub then GitLab.com)\n");
+        console.log("[output_directory] is optional (defaults to 'public').\n");
+        console.log("Example: readmesite bquast/readmesite");
+        process.exit(1);
+    }
+
+    try {
+        const repoInfo = await parseRepoIdentifier(repoIdentifierArg);
+        
+        let logIdentifier = repoInfo.originalIdentifier;
+        if (repoInfo.type === 'user_slash_repo') {
+             logIdentifier = `${repoInfo.user}/${repoInfo.repoName}`;
+        }
+        console.log(`Processing repository: ${logIdentifier} (Provider type determined: ${repoInfo.type})`);
+
+        const readmeContent = await fetchReadmeContent(repoInfo);
+        console.log("README.md fetched successfully.");
+
+        await generateSite(readmeContent, repoInfo.repoName, path.resolve(outputDirArg), repoInfo.originalIdentifier);
+
+        console.log("\n✅ Site generation complete!");
+        console.log(`\nStatic site files are located in: ${path.resolve(outputDirArg)}`);
+        console.log("\n🚀 To deploy to Cloudflare Pages (example):");
+        console.log("1. Push the output directory (e.g., 'public') to a new or existing Git repository.");
+        console.log("2. Connect that repository to Cloudflare Pages.");
+        console.log("   - Build command: Leave blank or use a command like 'echo No build needed'.");
+        console.log("   - Output directory: Specify the name of your output directory (e.g., 'public').");
+        console.log("OR");
+        console.log("1. Install Wrangler CLI: npm install -g wrangler");
+        console.log(`2. Navigate to your project directory: cd /path/to/your/project`); // This line may need adjustment if not in project root.
+        console.log(`3. Deploy directly: wrangler pages deploy ${path.basename(path.resolve(outputDirArg))}`);
+        console.log("OR");
+        console.log("1. Go to your Cloudflare dashboard -> Pages.");
+        console.log(`2. Choose 'Upload assets' and drag & drop the '${path.basename(path.resolve(outputDirArg))}' directory.`);
+
+    } catch (error) {
+        console.error(`\n❌ Error: ${error.message}`);
+        if (error.cause) { 
+             console.error(`Cause: ${error.cause}`);
+        }
+        process.exit(1);
+    }
+}
+
+main();
