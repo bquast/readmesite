@@ -2,11 +2,11 @@
 
 **readmesite** is a simple command-line interface (CLI) tool that converts a git repository's `README.md` file into a clean, single-page static website. It's designed to be zero-configuration for the target repository and generates sites that are easy to deploy.
 
-# The Problem
+## The Problem
 You have a great `README.md` on your git repository that explains your project well. You want a quick and easy way to turn this existing documentation into a standalone webpage without setting up complex static site generators or needing to add configuration files to your project repository.
 
 ## The Solution
-*readmesite* fetches your `README.md` directly from the git repo, converts it to HTML, applies some basic styling, and outputs a self-contained static site (an `index.html` and a `style.css`) ready for deployment.
+**readmesite** fetches your `README.md` directly from the git repo, converts it to HTML, applies some basic styling, and outputs a self-contained static site (an `index.html` and a `style.css`) ready for deployment.
 
 ## Features
 -   **zero-Config for Target Repo:** No need to add any files, configuration, or CLI arguments/flags to the repository whose README.md you want to convert.
