@@ -111,13 +111,13 @@ async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogI
     }
     
     // Prepare attribution strings
-    let repoUrlForComment = "Source repository not specified or detected."; 
+    let repoUrlForAttributionText = "Source repository not specified or detected."; 
     let displayPathForConsole = "N/A";
 
     const attributionUrlSource = footerLinkHref || ogUrlToUse; 
 
     if (attributionUrlSource) { 
-        repoUrlForComment = attributionUrlSource; 
+        repoUrlForAttributionText = attributionUrlSource; 
         try {
             const urlObj = new URL(attributionUrlSource);
             let pathName = urlObj.pathname.endsWith('.git') ? urlObj.pathname.slice(0, -4) : urlObj.pathname;
@@ -133,7 +133,7 @@ async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogI
     const safeConsoleRepoPath = displayPathForConsole
         .replace(/\\/g, '\\\\') 
         .replace(/`/g, '\\`')   
-        .replace(/\$\{/g, '\\${'); 
+        .replace(/\$\{/g, '\\${}'); 
 
     const browserConsoleLogScript = `<script>
   console.log(\`
@@ -153,6 +153,7 @@ ${safeConsoleRepoPath}
     } else if (footerLinkText) { 
         footerRepoSourceHtmlForDisplay = ` from ${footerLinkText}`;
     }
+
 
     const finalHtml = HTML_TEMPLATE
         .replace('{{TOP_HTML_COMMENT}}', topHtmlComment)
@@ -178,24 +179,12 @@ async function main() {
     
     const verboseFlagIndexInMain = rawArgs.indexOf('--verbose');
     if (verboseFlagIndexInMain !== -1) {
-        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true'; // isVerbose is global
+        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true';
         rawArgs.splice(verboseFlagIndexInMain, 1);
     }
-    // Ensure console log for verbose mode reflects the global const for consistency
     if (isVerbose && process.env.VERBOSE_READMESITE === 'true') { 
-        // Check if it was already logged by the global definition or log it here.
-        // To avoid double logging if this main() could be called multiple times (it's not currently):
-        // For simplicity, the global 'isVerbose' check handles the initial console.log if needed.
-        // Let's ensure it's logged if VERBOSE_READMESITE was just set.
-        if(!initialArgsForVerbose.includes('--verbose') && process.argv.includes('--verbose')) {
-             // This case is unlikely given current setup. Initial check of process.argv is better.
-        } else if (isVerbose) { // If global isVerbose is true, ensure it's logged once.
-            // This was handled by the top-level isVerbose check and console.log.
-            // For safety, if we want to be absolutely sure it's logged when main starts and verbose is on:
-            // console.log("Verbose mode enabled."); // This might be redundant if already logged
-        }
+        console.log("Verbose mode enabled.");
     }
-    if (isVerbose) console.log("Verbose mode active."); // A consistent log point for verbose in main
     
     let repoIdentifierArg = null;
     let outputDirArg = DEFAULT_OUTPUT_DIR;
@@ -280,9 +269,9 @@ async function main() {
             
             footerLinkHref = sanitizeUrlForPublicDisplay(rawLinkUrl);
             if (!ogUrlToUse && footerLinkHref) ogUrlToUse = footerLinkHref; 
-            else if (!ogUrlToUse && rawLinkUrl) ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl); // Sanitize rawLinkUrl again if used for ogUrlToUse
+            else if (!ogUrlToUse && rawLinkUrl) ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl);
 
-            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) { // Fallback for link text if not formed by type
+            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) {
                 footerLinkText = sanitizeUrlForPublicDisplay(actualSourceRepoInfo.originalIdentifier);
             }
         }
