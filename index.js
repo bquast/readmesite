@@ -9,16 +9,14 @@ const DEFAULT_OUTPUT_DIR = '.';
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
 const DEFAULT_IMAGE_FILENAME = 'readmesite-og-default.png';
 
-// Determine verbosity early and make it easily accessible
 const initialArgsForVerbose = process.argv.slice(2);
 const verboseArgIndexForIsVerbose = initialArgsForVerbose.indexOf('--verbose');
 const isVerbose = verboseArgIndexForIsVerbose !== -1;
 if (isVerbose) {
-    process.env.VERBOSE_READMESITE = 'true'; // Set env var for easy access in functions
+    process.env.VERBOSE_READMESITE = 'true';
 }
 
-const HTML_TEMPLATE = `{{TOP_HTML_COMMENT}}
-<!DOCTYPE html>
+const HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -110,27 +108,30 @@ async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogI
         if (isVerbose) console.log(`Including Google Analytics script for ID: ${gaPropertyId}`);
     }
     
-    // Prepare attribution strings
-    let repoUrlForAttributionText = "Source repository not specified or detected."; 
-    let displayPathForConsole = "N/A";
+    // For Browser Console Log and visible HTML Footer - use sanitized and formatted repo info
+    let displayPathForConsoleAndFooter = "N/A";
+    let repoUrlForConsoleAndFooter = footerLinkHref || ogUrlToUse || ""; 
 
-    const attributionUrlSource = footerLinkHref || ogUrlToUse; 
-
-    if (attributionUrlSource) { 
-        repoUrlForAttributionText = attributionUrlSource; 
+    if (repoUrlForConsoleAndFooter) { 
         try {
-            const urlObj = new URL(attributionUrlSource);
+            const urlObj = new URL(repoUrlForConsoleAndFooter); // Should be sanitized already
             let pathName = urlObj.pathname.endsWith('.git') ? urlObj.pathname.slice(0, -4) : urlObj.pathname;
             pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName; 
-            displayPathForConsole = `${urlObj.hostname}/${pathName}`;
+            displayPathForConsoleAndFooter = `${urlObj.hostname}/${pathName}`;
         } catch (e) {
-            displayPathForConsole = attributionUrlSource; 
+            displayPathForConsoleAndFooter = repoUrlForConsoleAndFooter; // Fallback if somehow still not a full URL
         }
+    } else if (footerLinkText) { // If we only have text (e.g. local mode, no .git/config)
+        displayPathForConsoleAndFooter = footerLinkText; // Use this text
+        repoUrlForConsoleAndFooter = "Local file or unlinked source"; // Adjust for comment
+    } else {
+        repoUrlForConsoleAndFooter = "Source repository not specified or detected.";
+        displayPathForConsoleAndFooter = "N/A";
     }
     
     const topHtmlComment = ``;
-
-    const safeConsoleRepoPath = displayPathForConsole
+    
+    const safeConsoleRepoPath = displayPathForConsoleAndFooter
         .replace(/\\/g, '\\\\') 
         .replace(/`/g, '\\`')   
         .replace(/\$\{/g, '\\${}'); 
@@ -148,15 +149,15 @@ ${safeConsoleRepoPath}
 </script>`;
 
     let footerRepoSourceHtmlForDisplay = '';
-    if (footerLinkHref && footerLinkText) {
+    if (footerLinkHref && footerLinkText) { // footerLinkText is already formatted to host/user/repo by main()
         footerRepoSourceHtmlForDisplay = ` from <a href="${footerLinkHref}" target="_blank" rel="noopener noreferrer">${footerLinkText}</a>`;
-    } else if (footerLinkText) { 
+    } else if (footerLinkText) { // Fallback if only text is available (e.g. local mode with no .git/config but used CWD name)
         footerRepoSourceHtmlForDisplay = ` from ${footerLinkText}`;
     }
 
 
     const finalHtml = HTML_TEMPLATE
-        .replace('{{TOP_HTML_COMMENT}}', topHtmlComment)
+        .replace('{{TOP_HTML_COMMENT}}', topHtmlComment) // This will now insert the correct comment
         .replace(/{{PAGE_TITLE}}/g, pageTitle)
         .replace('{{GOOGLE_ANALYTICS_SCRIPT}}', gaScriptHtml)
         .replace(/{{OG_URL}}/g, ogUrlToUse || '')
@@ -214,9 +215,9 @@ async function main() {
         const resolvedOutputDir = path.resolve(outputDirArg);
         let pageTitle;
         let readmeContent;
-        let ogUrlToUse = '';
-        let footerLinkHref = null;
-        let footerLinkText = null;
+        let ogUrlToUse = ''; // For <meta property="og:url"...>
+        let footerLinkHref = null; // For the <a> tag in the visible footer
+        let footerLinkText = null; // For the text of the <a> tag in the visible footer
 
         if (localMode) {
             console.log(`Processing local '${localReadmePath}' -> '${resolvedOutputDir}'`);
@@ -237,17 +238,17 @@ async function main() {
                     const parsedUrl = new URL(sanitizedUrl); 
                     let pathName = parsedUrl.pathname.endsWith('.git') ? parsedUrl.pathname.slice(0, -4) : parsedUrl.pathname;
                     pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName;
-                    footerLinkText = `${parsedUrl.hostname}/${pathName}`;
-                } catch(e) {footerLinkText = localGitInfo.name; } 
+                    footerLinkText = `${parsedUrl.hostname}/${pathName}`; // Format: host/user/repo
+                } catch(e) {footerLinkText = localGitInfo.name; } // Fallback to name from getLocalGitRepoInfo
                 if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${footerLinkHref}`);
             }
-        } else { 
+        } else { // Remote mode
             const initialRepoInfo = await parseRepoIdentifier(repoIdentifierArg);
             let potentialOgUrl = '';
             if (initialRepoInfo.originalIdentifier && (initialRepoInfo.originalIdentifier.startsWith('https://') || initialRepoInfo.originalIdentifier.startsWith('http://'))) {
                  try { new URL(initialRepoInfo.originalIdentifier); potentialOgUrl = initialRepoInfo.originalIdentifier; } catch(e) {/*ignore*/}
             }
-            ogUrlToUse = sanitizeUrlForPublicDisplay(potentialOgUrl);
+            ogUrlToUse = sanitizeUrlForPublicDisplay(potentialOgUrl); // Sanitize the original input if it's a URL
             
             let logIdentifier = initialRepoInfo.originalIdentifier;
             if (initialRepoInfo.type === 'user_slash_repo') { logIdentifier = `${initialRepoInfo.user}/${initialRepoInfo.repoName}`; }
@@ -262,17 +263,35 @@ async function main() {
             pageTitle = extractFirstH1(readmeContent) || actualSourceRepoInfo.repoName;
             if (isVerbose) console.log(`Determined page title (remote): "${pageTitle}"`);
             
-            let rawLinkUrl = '';
-            if (actualSourceRepoInfo.type === 'github') { rawLinkUrl = `https://github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; footerLinkText = `github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; }
-            else if (actualSourceRepoInfo.type === 'gitlab') { rawLinkUrl = `https://gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; footerLinkText = `gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; }
-            else if (actualSourceRepoInfo.type === 'unknown_gitlab_like') { rawLinkUrl = `https://${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; footerLinkText = `${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; }
+            let rawLinkUrl = ''; // Will be the canonical, clean URL to the repo homepage
+            if (actualSourceRepoInfo.type === 'github') { 
+                rawLinkUrl = `https://github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; 
+                footerLinkText = `github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; 
+            } else if (actualSourceRepoInfo.type === 'gitlab') { 
+                rawLinkUrl = `https://gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; 
+                footerLinkText = `gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; 
+            } else if (actualSourceRepoInfo.type === 'unknown_gitlab_like') { 
+                rawLinkUrl = `https://${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; 
+                footerLinkText = `${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; 
+            }
             
-            footerLinkHref = sanitizeUrlForPublicDisplay(rawLinkUrl);
-            if (!ogUrlToUse && footerLinkHref) ogUrlToUse = footerLinkHref; 
-            else if (!ogUrlToUse && rawLinkUrl) ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl);
+            footerLinkHref = sanitizeUrlForPublicDisplay(rawLinkUrl); // Should be clean already, but sanitize just in case
+            
+            // If ogUrlToUse wasn't set from a full input URL, use the canonical (and sanitized) repo URL.
+            if (!ogUrlToUse && footerLinkHref) {
+                 ogUrlToUse = footerLinkHref; 
+            } else if (!ogUrlToUse && rawLinkUrl) { // One last attempt if footerLinkHref was somehow lost
+                ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl);
+            }
 
-            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) {
-                footerLinkText = sanitizeUrlForPublicDisplay(actualSourceRepoInfo.originalIdentifier);
+            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) { // Fallback for link text if not formed by type
+                const sanitizedOriginalId = sanitizeUrlForPublicDisplay(actualSourceRepoInfo.originalIdentifier);
+                try {
+                    const parsedId = new URL(sanitizedOriginalId);
+                     let pathName = parsedId.pathname.endsWith('.git') ? parsedId.pathname.slice(0, -4) : parsedId.pathname;
+                    pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName;
+                    footerLinkText = `${parsedId.hostname}/${pathName}`;
+                } catch(e) { footerLinkText = sanitizedOriginalId; }
             }
         }
         
