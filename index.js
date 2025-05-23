@@ -5,17 +5,15 @@ import path from 'path';
 import { marked } from 'marked';
 import { fileURLToPath } from 'url';
 
-const DEFAULT_OUTPUT_DIR = 'public';
+const DEFAULT_OUTPUT_DIR = '.'; // Changed from 'public'
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
 const DEFAULT_IMAGE_FILENAME = 'readmesite-og-default.png';
 
-// Determine verbosity early and make it easily accessible
-const initialArgs = process.argv.slice(2);
-const verboseArgIndex = initialArgs.indexOf('--verbose');
-const isVerbose = verboseArgIndex !== -1;
+const initialArgsForVerbose = process.argv.slice(2);
+const verboseArgIndexForIsVerbose = initialArgsForVerbose.indexOf('--verbose');
+const isVerbose = verboseArgIndexForIsVerbose !== -1;
 if (isVerbose) {
-    process.env.VERBOSE_READMESITE = 'true'; // Set env var for easy access in functions
-    // We'll remove --verbose from args array later in main()
+    process.env.VERBOSE_READMESITE = 'true';
 }
 
 const HTML_TEMPLATE = `<!DOCTYPE html>
@@ -24,20 +22,18 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{PAGE_TITLE}}</title>
-
+    {{GOOGLE_ANALYTICS_SCRIPT}}
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{OG_URL}}">
     <meta property="og:title" content="{{PAGE_TITLE}}">
     <meta property="og:description" content="View the README for the {{PAGE_TITLE}} repository.">
     <meta property="og:image" content="{{OG_IMAGE_URL}}">
     <meta property="og:site_name" content="{{PAGE_TITLE}}">
-
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{OG_URL}}">
     <meta name="twitter:title" content="{{PAGE_TITLE}}">
     <meta name="twitter:description" content="View the README for the {{PAGE_TITLE}} repository.">
     <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
-
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="{{FAVICON_URL}}" type="image/png">
 </head>
@@ -52,61 +48,16 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const CSS_STYLES = `
-body {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; line-height: 1.6; color: #24292e; margin: 0; padding: 0; background-color: #f6f8fa;}
-.container {max-width: 800px; margin: 30px auto; padding: 20px 40px; background-color: #ffffff; border: 1px solid #d1d5da; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);}
-h1,h2,h3,h4,h5,h6 {margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; border-bottom: 1px solid #eaecef; padding-bottom: .3em;}
-h1 {font-size: 2em;} h2 {font-size: 1.5em;} h3 {font-size: 1.25em;} h4 {font-size: 1em;} h5 {font-size: .875em;} h6 {font-size: .85em; color: #6a737d;}
-p {margin-top:0; margin-bottom:16px;} ul,ol {margin-top:0; margin-bottom:16px; padding-left:2em;}
-a {color:#0366d6; text-decoration:none;} a:hover {text-decoration:underline;}
-code {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; background-color:rgba(27,31,35,.05); border-radius:3px; padding:.2em .4em; margin:0;}
-pre {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; line-height:1.45; background-color:#f6f8fa; border-radius:3px; padding:16px; overflow:auto; margin-bottom:16px;}
-pre code {font-size:100%; padding:0; margin:0; background-color:transparent; border:0; display:inline; max-width:auto; overflow:visible; line-height:inherit; word-wrap:normal;}
-img {max-width:100%; height:auto; box-sizing:border-box; margin-top:16px; margin-bottom:16px;}
-blockquote {margin:0 0 16px 0; padding:0 1em; color:#6a737d; border-left:.25em solid #dfe2e5;}
-table {border-collapse:collapse; margin-bottom:16px; width:100%; display:block; overflow:auto;}
-th,td {border:1px solid #dfe2e5; padding:6px 13px;}
-tr {background-color:#fff; border-top:1px solid #c6cbd1;} tr:nth-child(2n) {background-color:#f6f8fa;}
-hr {height:.25em; padding:0; margin:24px 0; background-color:#e1e4e8; border:0;} /* Default for Markdown <hr> */
-
-hr.readmesite-footer-separator {height: 2px; background-color: #d1d5da; border: none; margin-top: 48px; margin-bottom: 24px;}
-div.readmesite-footer {text-align: center; font-size: 0.85em; color: #586069; padding-bottom: 10px; margin-top: 0;}
-div.readmesite-footer p { margin: 0; }
-div.readmesite-footer a {color: #0366d6; text-decoration: none;}
-div.readmesite-footer a:hover {text-decoration: underline;}
-`;
+const CSS_STYLES = `body {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; line-height: 1.6; color: #24292e; margin: 0; padding: 0; background-color: #f6f8fa;} .container {max-width: 800px; margin: 30px auto; padding: 20px 40px; background-color: #ffffff; border: 1px solid #d1d5da; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);} h1,h2,h3,h4,h5,h6 {margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; border-bottom: 1px solid #eaecef; padding-bottom: .3em;} h1 {font-size: 2em;} h2 {font-size: 1.5em;} h3 {font-size: 1.25em;} h4 {font-size: 1em;} h5 {font-size: .875em;} h6 {font-size: .85em; color: #6a737d;} p {margin-top:0; margin-bottom:16px;} ul,ol {margin-top:0; margin-bottom:16px; padding-left:2em;} a {color:#0366d6; text-decoration:none;} a:hover {text-decoration:underline;} code {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; background-color:rgba(27,31,35,.05); border-radius:3px; padding:.2em .4em; margin:0;} pre {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; line-height:1.45; background-color:#f6f8fa; border-radius:3px; padding:16px; overflow:auto; margin-bottom:16px;} pre code {font-size:100%; padding:0; margin:0; background-color:transparent; border:0; display:inline; max-width:auto; overflow:visible; line-height:inherit; word-wrap:normal;} img {max-width:100%; height:auto; box-sizing:border-box; margin-top:16px; margin-bottom:16px;} blockquote {margin:0 0 16px 0; padding:0 1em; color:#6a737d; border-left:.25em solid #dfe2e5;} table {border-collapse:collapse; margin-bottom:16px; width:100%; display:block; overflow:auto;} th,td {border:1px solid #dfe2e5; padding:6px 13px;} tr {background-color:#fff; border-top:1px solid #c6cbd1;} tr:nth-child(2n) {background-color:#f6f8fa;} hr {height:.25em; padding:0; margin:24px 0; background-color:#e1e4e8; border:0;} hr.readmesite-footer-separator {height: 2px; background-color: #d1d5da; border: none; margin-top: 48px; margin-bottom: 24px;} div.readmesite-footer {text-align: center; font-size: 0.85em; color: #586069; padding-bottom: 10px; margin-top: 0;} div.readmesite-footer p { margin: 0; } div.readmesite-footer a {color: #0366d6; text-decoration: none;} div.readmesite-footer a:hover {text-decoration: underline;}`;
 
 function getPlainTextFromInlineTokens(inlineTokens) { return inlineTokens.map(token => { if (token.type === 'text' || token.type === 'codespan') { return token.raw || token.text; } if (token.tokens && token.tokens.length > 0) { return getPlainTextFromInlineTokens(token.tokens); } return token.raw || token.text || ''; }).join(''); }
 function extractFirstH1(markdownContent) { if (!markdownContent) return null; try { const tokens = marked.lexer(markdownContent); const firstH1Token = tokens.find(token => token.type === 'heading' && token.depth === 1); if (firstH1Token && firstH1Token.tokens) { let title = getPlainTextFromInlineTokens(firstH1Token.tokens).trim(); title = title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#039;/g, "'"); return title || null; } } catch (e) { if (isVerbose) console.warn(`Warning: Could not extract H1 title from README: ${e.message}`); } return null; }
 async function parseRepoIdentifier(identifier) { if (!identifier) { throw new Error("Repository identifier argument is missing."); } try { const url = new URL(identifier); const hostname = url.hostname.toLowerCase(); const pathParts = url.pathname.split('/').filter(Boolean); if (pathParts.length < 2) { throw new Error(`URL path does not seem to contain enough segments for a repository: ${url.pathname}`); } if (hostname === 'github.com') { return { type: 'github', host: hostname, user: pathParts[0], repoName: pathParts[1], originalIdentifier: identifier }; } else if (hostname === 'gitlab.com') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); return { type: 'gitlab', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } else if (url.protocol === 'https:') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); if (isVerbose) console.log(`Info: Processing unknown host '${hostname}' using GitLab-like URL pattern.`); return { type: 'unknown_gitlab_like', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } } catch (e) { if (!(e instanceof TypeError && e.message.includes("Invalid URL"))) { if (isVerbose) console.warn(`URL parsing attempt failed for '${identifier}': ${e.message}. Will try as 'user/repo'.`); } } if (identifier.includes('://')) { throw new Error(`Invalid repository identifier: '${identifier}'. Full URLs must be valid. For 'user/repo' shorthand, do not include protocol.`); } const parts = identifier.split('/'); if (parts.length === 2 && parts[0] && parts[1] && !parts[0].includes('.') && !parts[1].includes('.')) { return { type: 'user_slash_repo', user: parts[0], repoName: parts[1], originalIdentifier: identifier }; } throw new Error(`Could not parse repository identifier: '${identifier}'. Please use 'username/repository' format or a full HTTPS URL.`); }
 async function tryFetchForProvider(providerRepoInfo, branches, filePath) { let lastBranchError = null; for (const branch of branches) { let readmeUrl; const repoDisplayPath = providerRepoInfo.type === 'github' ? `${providerRepoInfo.user}/${providerRepoInfo.repoName}` : `${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}`; if (providerRepoInfo.type === 'github') { readmeUrl = `https://raw.githubusercontent.com/${providerRepoInfo.user}/${providerRepoInfo.repoName}/${branch}/${filePath}`; } else if (providerRepoInfo.type === 'gitlab' || providerRepoInfo.type === 'unknown_gitlab_like') { readmeUrl = `https://${providerRepoInfo.host}/${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}/-/raw/${branch}/${filePath}`; } else { return { content: null, error: new Error(`Internal error: Unsupported provider type: ${providerRepoInfo.type}`) }; } if (isVerbose) console.log(`Attempting: ${readmeUrl}`); try { const response = await fetch(readmeUrl); if (response.ok) { return { content: await response.text(), error: null }; } if (response.status === 404) { lastBranchError = new Error(`${filePath} not found on branch '${branch}' for ${repoDisplayPath} at ${providerRepoInfo.host}`); if (isVerbose) console.warn(lastBranchError.message); } else { throw new Error(`Failed to fetch ${filePath} from ${readmeUrl}. Status: ${response.status} ${response.statusText}`); } } catch (fetchError) { lastBranchError = new Error(`Network/fetch error for ${readmeUrl}: ${fetchError.message}`); console.warn(lastBranchError.message); return { content: null, error: lastBranchError }; } } return { content: null, error: lastBranchError || new Error(`${filePath} not found on any attempted branch for ${repoDisplayPath} at ${providerRepoInfo.host}.`) }; }
 async function fetchReadmeContent(initialRepoInfo) { const filePath = 'README.md'; if (initialRepoInfo.type === 'user_slash_repo') { if (isVerbose) console.log(`Input '${initialRepoInfo.originalIdentifier}' is 'username/repository' shorthand.`); if (isVerbose) console.log("Attempting to resolve on GitHub (github.com)..."); const githubInfo = { type: 'github', host: 'github.com', user: initialRepoInfo.user, repoName: initialRepoInfo.repoName, originalIdentifier: initialRepoInfo.originalIdentifier }; let result = await tryFetchForProvider(githubInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: githubInfo }; } console.warn(`GitHub attempt for '${initialRepoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); if (isVerbose) console.log("Attempting to resolve on GitLab (gitlab.com)..."); const gitlabInfo = { type: 'gitlab', host: 'gitlab.com', userOrGroupPath: initialRepoInfo.user, repoName: initialRepoInfo.repoName, originalIdentifier: initialRepoInfo.originalIdentifier }; result = await tryFetchForProvider(gitlabInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: gitlabInfo }; } console.warn(`GitLab.com attempt for '${initialRepoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); throw new Error(`Could not resolve '${initialRepoInfo.originalIdentifier}' on GitHub or GitLab.com, or ${filePath} not found on any tried branch.`); } else { const result = await tryFetchForProvider(initialRepoInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: initialRepoInfo }; } throw result.error || new Error(`Could not find ${filePath} for '${initialRepoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`); } }
+async function getLocalGitRepoInfo() { try { const gitConfigPath = path.join(process.cwd(), '.git', 'config'); const configContent = await fs.readFile(gitConfigPath, 'utf-8'); const originUrlMatch = configContent.match(/\[remote\s+"origin"\]\s*[^\[]*?\s*url\s*=\s*([^\s]+)/); if (originUrlMatch && originUrlMatch[1]) { let url = originUrlMatch[1]; url = url.replace(/^git@([^:]+):(.+?)(\.git)?$/, 'https://$1/$2'); if (url.endsWith('.git')) url = url.substring(0, url.length - 4); if (url.startsWith('http://')) url = 'https://' + url.substring(7); if (!url.startsWith('https://')) { if (isVerbose) console.log(`Info: Non-standard remote URL found in .git/config: ${originUrlMatch[1]}`); return null; } let displayName = url; try { const parsedUrl = new URL(url); const pathParts = parsedUrl.pathname.split('/').filter(Boolean); if (pathParts.length >= 2) displayName = `${pathParts[pathParts.length - 2]}/${pathParts[pathParts.length - 1]}`; else if (pathParts.length === 1) displayName = pathParts[0]; } catch (e) { /* Use full URL as displayName if parsing path fails */ } return { url: url, name: displayName }; } } catch (e) { if (isVerbose) console.log(`Info: Could not determine local git repository URL from .git/config. (${e.message})`); } return null; }
 
-async function getLocalGitRepoInfo() {
-    try {
-        const gitConfigPath = path.join(process.cwd(), '.git', 'config');
-        const configContent = await fs.readFile(gitConfigPath, 'utf-8');
-        const originUrlMatch = configContent.match(/\[remote\s+"origin"\]\s*[^\[]*?\s*url\s*=\s*([^\s]+)/);
-        if (originUrlMatch && originUrlMatch[1]) {
-            let url = originUrlMatch[1];
-            url = url.replace(/^git@([^:]+):(.+?)(\.git)?$/, 'https://$1/$2');
-            if (url.endsWith('.git')) url = url.substring(0, url.length - 4);
-            if (url.startsWith('http://')) url = 'https://' + url.substring(7);
-            if (!url.startsWith('https://')) { if (isVerbose) console.log(`Info: Non-standard remote URL found in .git/config: ${originUrlMatch[1]}`); return null; }
-            let displayName = url;
-            try {
-                const parsedUrl = new URL(url);
-                const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-                if (pathParts.length >= 2) displayName = `${pathParts[pathParts.length - 2]}/${pathParts[pathParts.length - 1]}`;
-                else if (pathParts.length === 1) displayName = pathParts[0];
-            } catch (e) { /* Use full URL as displayName if parsing path fails */ }
-            return { url: url, name: displayName };
-        }
-    } catch (e) { if (isVerbose) console.log(`Info: Could not determine local git repository URL from .git/config. (${e.message})`); }
-    return null;
-}
-
-async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogImageUrlCli, footerRepoSourceHtml) {
+async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogImageUrlCli, footerRepoSourceHtml, gaPropertyId) {
     if (isVerbose) console.log(`Generating site for "${pageTitle}" in directory: ${outputDir}`);
     try { await fs.mkdir(outputDir, { recursive: true }); }
     catch (error) { throw new Error(`Failed to create output directory '${outputDir}': ${error.message}`); }
@@ -130,8 +81,22 @@ async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogI
     if (ogImageUrlCli && isVerbose) console.log(`Using custom image for OG/Twitter previews: ${ogImageUrlCli}`);
     else if (!ogImageUrlCli && defaultOgImageForMeta && isVerbose) console.log(`Using default image as fallback OG image: ${defaultOgImageForMeta}`);
 
+    let gaScriptHtml = '';
+    if (gaPropertyId) {
+        gaScriptHtml = `
+    <script async src="https://www.googletagmanager.com/gtag/js?id=${gaPropertyId}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '${gaPropertyId}');
+    </script>`;
+        if (isVerbose) console.log(`Including Google Analytics script for ID: ${gaPropertyId}`);
+    }
+
     const finalHtml = HTML_TEMPLATE
         .replace(/{{PAGE_TITLE}}/g, pageTitle)
+        .replace('{{GOOGLE_ANALYTICS_SCRIPT}}', gaScriptHtml)
         .replace(/{{OG_URL}}/g, ogUrlToUse || '')
         .replace(/{{FAVICON_URL}}/g, faviconPathInHtml)
         .replace(/{{OG_IMAGE_URL}}/g, finalOgImageUrl)
@@ -148,36 +113,52 @@ function isLikelyRepoIdentifier(arg) { return arg.includes('/') || arg.startsWit
 
 async function main() {
     let rawArgs = process.argv.slice(2);
-    // isVerbose is defined globally now. We just need to remove the flag from rawArgs if present.
+    
+    // Remove --verbose if present, isVerbose is already globally set
     const verboseFlagIndexInMain = rawArgs.indexOf('--verbose');
     if (verboseFlagIndexInMain !== -1) {
         rawArgs.splice(verboseFlagIndexInMain, 1);
-        // No need to set process.env.VERBOSE_READMESITE here again if global const is used by helpers
-        // but if helpers check process.env, it should have been set by the global const logic.
-        // For clarity, let's ensure process.env is set if we prefer helpers to use that.
-        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true';
-        if (isVerbose) console.log("Verbose mode enabled.");
+    }
+    if (isVerbose && !process.env.VERBOSE_READMESITE) { // Ensure env var is set if main is re-entered or similar
+        process.env.VERBOSE_READMESITE = 'true'; 
+        console.log("Verbose mode enabled."); // Log once if globally set
     }
     
     let repoIdentifierArg = null;
     let outputDirArg = DEFAULT_OUTPUT_DIR;
     let imageUrlArg = null;
+    let gaPropertyIdArg = null;
     let localMode = false;
     const localReadmePath = 'README.md';
     
     const imageFlagIndex = rawArgs.indexOf('--image');
     if (imageFlagIndex !== -1) { if (imageFlagIndex + 1 < rawArgs.length && !rawArgs[imageFlagIndex + 1].startsWith('--')) { imageUrlArg = rawArgs[imageFlagIndex + 1]; rawArgs.splice(imageFlagIndex, 2); } else { console.warn("Warning: --image flag provided without a valid URL. Ignoring flag."); rawArgs.splice(imageFlagIndex, 1); } }
 
+    const gaFlagIndex = rawArgs.indexOf('--ga');
+    if (gaFlagIndex !== -1) {
+        if (gaFlagIndex + 1 < rawArgs.length && !rawArgs[gaFlagIndex + 1].startsWith('--')) {
+            gaPropertyIdArg = rawArgs[gaFlagIndex + 1];
+            rawArgs.splice(gaFlagIndex, 2);
+        } else {
+            console.warn("Warning: --ga flag provided without a Property ID. Ignoring flag.");
+            rawArgs.splice(gaFlagIndex, 1);
+        }
+    }
+
     if (rawArgs.length === 0) { localMode = true; }
     else if (rawArgs.length === 1) { if (isLikelyRepoIdentifier(rawArgs[0])) { repoIdentifierArg = rawArgs[0]; } else { localMode = true; outputDirArg = rawArgs[0]; } }
     else { repoIdentifierArg = rawArgs[0]; outputDirArg = rawArgs[1]; }
 
-    if (!localMode && !repoIdentifierArg) { // This condition should ideally not be met if parsing logic is correct.
+    if (!localMode && !repoIdentifierArg) {
         console.error("Error: Operation could not be determined. Please provide a repository identifier or run with no identifier for local mode.\n");
-        console.log("Usage for remote repository:"); console.log("  readmesite <repository_identifier> [output_directory] [--image <image_url>] [--verbose]\n");
-        console.log("Usage for local README.md (in current directory):"); console.log("  readmesite [output_directory] [--image <image_url>] [--verbose]\n");
-        console.log("If no arguments are given, it processes ./README.md into ./public.\n");
-        console.log("Options:"); console.log("  --image <image_url>      URL for social media preview image."); console.log("  --verbose                Enable verbose logging."); process.exit(1);
+        console.log("Usage for remote repository:"); console.log("  readmesite <repository_identifier> [output_directory] [--image <image_url>] [--ga <GA_ID>] [--verbose]\n");
+        console.log("Usage for local README.md (in current directory):"); console.log("  readmesite [output_directory] [--image <image_url>] [--ga <GA_ID>] [--verbose]\n");
+        console.log("If no arguments are given, it processes ./README.md into the current directory ('.').\n");
+        console.log("Options:"); 
+        console.log("  --image <image_url>      URL for social media preview image.");
+        console.log("  --ga <GA_ID>             Google Analytics Property ID (e.g., G-XXXXXXXXXX).");
+        console.log("  --verbose                Enable verbose logging."); 
+        process.exit(1);
     }
 
     try {
@@ -203,7 +184,7 @@ async function main() {
                 footerRepoSourceHtml = ` from <a href="${localGitInfo.url}" target="_blank" rel="noopener noreferrer">${localGitInfo.name}</a>`;
                 if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${localGitInfo.url}`);
             }
-        } else { // Remote mode
+        } else { 
             const initialRepoInfo = await parseRepoIdentifier(repoIdentifierArg);
             if (initialRepoInfo.originalIdentifier && (initialRepoInfo.originalIdentifier.startsWith('https://') || initialRepoInfo.originalIdentifier.startsWith('http://'))) {
                  try { new URL(initialRepoInfo.originalIdentifier); ogUrlToUse = initialRepoInfo.originalIdentifier; } catch(e) {/*ignore bad original id for og url*/}
@@ -237,7 +218,9 @@ async function main() {
         }
         
         if (isVerbose && imageUrlArg) console.log(`Custom image for social previews: ${imageUrlArg}`);
-        await generateSite(readmeContent, pageTitle, resolvedOutputDir, ogUrlToUse, imageUrlArg, footerRepoSourceHtml);
+        if (isVerbose && gaPropertyIdArg) console.log(`Google Analytics ID to be used: ${gaPropertyIdArg}`);
+        
+        await generateSite(readmeContent, pageTitle, resolvedOutputDir, ogUrlToUse, imageUrlArg, footerRepoSourceHtml, gaPropertyIdArg);
 
         console.log(`\n✅ Site generation complete!`);
         console.log(`Static site files are located in: ${resolvedOutputDir}`);
@@ -246,6 +229,9 @@ async function main() {
             console.log("\n🚀 To deploy (example for Cloudflare Pages):");
             console.log("   If building locally, you can push the output directory or use Wrangler.");
             console.log("   If building on Cloudflare Pages, your build command could be as simple as: npx readmesite");
+            if (resolvedOutputDir === path.resolve('.')) {
+                 console.log("   (Since output is to '.', ensure Cloudflare Pages output directory is set to root or empty).");
+            }
         }
     } catch (error) {
         console.error(`\n❌ Error: ${error.message}`);
