@@ -52,9 +52,22 @@ const HTML_TEMPLATE = `{{TOP_HTML_COMMENT}}
 
 const CSS_STYLES = `body {font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; line-height: 1.6; color: #24292e; margin: 0; padding: 0; background-color: #f6f8fa;} .container {max-width: 800px; margin: 30px auto; padding: 20px 40px; background-color: #ffffff; border: 1px solid #d1d5da; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);} h1,h2,h3,h4,h5,h6 {margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; border-bottom: 1px solid #eaecef; padding-bottom: .3em;} h1 {font-size: 2em;} h2 {font-size: 1.5em;} h3 {font-size: 1.25em;} h4 {font-size: 1em;} h5 {font-size: .875em;} h6 {font-size: .85em; color: #6a737d;} p {margin-top:0; margin-bottom:16px;} ul,ol {margin-top:0; margin-bottom:16px; padding-left:2em;} a {color:#0366d6; text-decoration:none;} a:hover {text-decoration:underline;} code {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; background-color:rgba(27,31,35,.05); border-radius:3px; padding:.2em .4em; margin:0;} pre {font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size:85%; line-height:1.45; background-color:#f6f8fa; border-radius:3px; padding:16px; overflow:auto; margin-bottom:16px;} pre code {font-size:100%; padding:0; margin:0; background-color:transparent; border:0; display:inline; max-width:auto; overflow:visible; line-height:inherit; word-wrap:normal;} img {max-width:100%; height:auto; box-sizing:border-box; margin-top:16px; margin-bottom:16px;} blockquote {margin:0 0 16px 0; padding:0 1em; color:#6a737d; border-left:.25em solid #dfe2e5;} table {border-collapse:collapse; margin-bottom:16px; width:100%; display:block; overflow:auto;} th,td {border:1px solid #dfe2e5; padding:6px 13px;} tr {background-color:#fff; border-top:1px solid #c6cbd1;} tr:nth-child(2n) {background-color:#f6f8fa;} hr {height:.25em; padding:0; margin:24px 0; background-color:#e1e4e8; border:0;} hr.readmesite-footer-separator {height: 2px; background-color: #d1d5da; border: none; margin-top: 48px; margin-bottom: 24px;} div.readmesite-footer {text-align: center; font-size: 0.85em; color: #586069; padding-bottom: 10px; margin-top: 0;} div.readmesite-footer p { margin: 0; } div.readmesite-footer a {color: #0366d6; text-decoration: none;} div.readmesite-footer a:hover {text-decoration: underline;}`;
 
+function sanitizeUrlForPublicDisplay(urlString) {
+    if (!urlString || typeof urlString !== 'string' || (!urlString.startsWith('http:') && !urlString.startsWith('https://'))) {
+        return urlString; 
+    }
+    try {
+        const urlObj = new URL(urlString);
+        return `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? ':' + urlObj.port : ''}${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
+    } catch (e) {
+        if (isVerbose) console.warn(`Warning: Could not sanitize URL '${urlString}': ${e.message}`);
+        return urlString; 
+    }
+}
+
 function getPlainTextFromInlineTokens(inlineTokens) { return inlineTokens.map(token => { if (token.type === 'text' || token.type === 'codespan') { return token.raw || token.text; } if (token.tokens && token.tokens.length > 0) { return getPlainTextFromInlineTokens(token.tokens); } return token.raw || token.text || ''; }).join(''); }
 function extractFirstH1(markdownContent) { if (!markdownContent) return null; try { const tokens = marked.lexer(markdownContent); const firstH1Token = tokens.find(token => token.type === 'heading' && token.depth === 1); if (firstH1Token && firstH1Token.tokens) { let title = getPlainTextFromInlineTokens(firstH1Token.tokens).trim(); title = title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#039;/g, "'"); return title || null; } } catch (e) { if (isVerbose) console.warn(`Warning: Could not extract H1 title from README: ${e.message}`); } return null; }
-async function parseRepoIdentifier(identifier) { if (!identifier) { throw new Error("Repository identifier argument is missing."); } try { const url = new URL(identifier); const hostname = url.hostname.toLowerCase(); const pathParts = url.pathname.split('/').filter(Boolean); if (pathParts.length < 2) { throw new Error(`URL path does not seem to contain enough segments for a repository: ${url.pathname}`); } if (hostname === 'github.com') { return { type: 'github', host: hostname, user: pathParts[0], repoName: pathParts[1], originalIdentifier: identifier }; } else if (hostname === 'gitlab.com') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); return { type: 'gitlab', host: hostname, userOrGroupPath: userOrGropPath, repoName: repoName, originalIdentifier: identifier }; } else if (url.protocol === 'https:') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); if (isVerbose) console.log(`Info: Processing unknown host '${hostname}' using GitLab-like URL pattern.`); return { type: 'unknown_gitlab_like', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } } catch (e) { if (!(e instanceof TypeError && e.message.includes("Invalid URL"))) { if (isVerbose) console.warn(`URL parsing attempt failed for '${identifier}': ${e.message}. Will try as 'user/repo'.`); } } if (identifier.includes('://')) { throw new Error(`Invalid repository identifier: '${identifier}'. Full URLs must be valid. For 'user/repo' shorthand, do not include protocol.`); } const parts = identifier.split('/'); if (parts.length === 2 && parts[0] && parts[1] && !parts[0].includes('.') && !parts[1].includes('.')) { return { type: 'user_slash_repo', user: parts[0], repoName: parts[1], originalIdentifier: identifier }; } throw new Error(`Could not parse repository identifier: '${identifier}'. Please use 'username/repository' format or a full HTTPS URL.`); }
+async function parseRepoIdentifier(identifier) { if (!identifier) { throw new Error("Repository identifier argument is missing."); } try { const url = new URL(identifier); const hostname = url.hostname.toLowerCase(); const pathParts = url.pathname.split('/').filter(Boolean); if (pathParts.length < 2) { throw new Error(`URL path does not seem to contain enough segments for a repository: ${url.pathname}`); } if (hostname === 'github.com') { return { type: 'github', host: hostname, user: pathParts[0], repoName: pathParts[1], originalIdentifier: identifier }; } else if (hostname === 'gitlab.com') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); return { type: 'gitlab', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } else if (url.protocol === 'https:') { const repoName = pathParts[pathParts.length - 1]; const userOrGroupPath = pathParts.slice(0, pathParts.length - 1).join('/'); if (isVerbose) console.log(`Info: Processing unknown host '${hostname}' using GitLab-like URL pattern.`); return { type: 'unknown_gitlab_like', host: hostname, userOrGroupPath: userOrGroupPath, repoName: repoName, originalIdentifier: identifier }; } } catch (e) { if (!(e instanceof TypeError && e.message.includes("Invalid URL"))) { if (isVerbose) console.warn(`URL parsing attempt failed for '${identifier}': ${e.message}. Will try as 'user/repo'.`); } } if (identifier.includes('://')) { throw new Error(`Invalid repository identifier: '${identifier}'. Full URLs must be valid. For 'user/repo' shorthand, do not include protocol.`); } const parts = identifier.split('/'); if (parts.length === 2 && parts[0] && parts[1] && !parts[0].includes('.') && !parts[1].includes('.')) { return { type: 'user_slash_repo', user: parts[0], repoName: parts[1], originalIdentifier: identifier }; } throw new Error(`Could not parse repository identifier: '${identifier}'. Please use 'username/repository' format or a full HTTPS URL.`); }
 async function tryFetchForProvider(providerRepoInfo, branches, filePath) { let lastBranchError = null; for (const branch of branches) { let readmeUrl; const repoDisplayPath = providerRepoInfo.type === 'github' ? `${providerRepoInfo.user}/${providerRepoInfo.repoName}` : `${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}`; if (providerRepoInfo.type === 'github') { readmeUrl = `https://raw.githubusercontent.com/${providerRepoInfo.user}/${providerRepoInfo.repoName}/${branch}/${filePath}`; } else if (providerRepoInfo.type === 'gitlab' || providerRepoInfo.type === 'unknown_gitlab_like') { readmeUrl = `https://${providerRepoInfo.host}/${providerRepoInfo.userOrGroupPath}/${providerRepoInfo.repoName}/-/raw/${branch}/${filePath}`; } else { return { content: null, error: new Error(`Internal error: Unsupported provider type: ${providerRepoInfo.type}`) }; } if (isVerbose) console.log(`Attempting: ${readmeUrl}`); try { const response = await fetch(readmeUrl); if (response.ok) { return { content: await response.text(), error: null }; } if (response.status === 404) { lastBranchError = new Error(`${filePath} not found on branch '${branch}' for ${repoDisplayPath} at ${providerRepoInfo.host}`); if (isVerbose) console.warn(lastBranchError.message); } else { throw new Error(`Failed to fetch ${filePath} from ${readmeUrl}. Status: ${response.status} ${response.statusText}`); } } catch (fetchError) { lastBranchError = new Error(`Network/fetch error for ${readmeUrl}: ${fetchError.message}`); console.warn(lastBranchError.message); return { content: null, error: lastBranchError }; } } return { content: null, error: lastBranchError || new Error(`${filePath} not found on any attempted branch for ${repoDisplayPath} at ${providerRepoInfo.host}.`) }; }
 async function fetchReadmeContent(initialRepoInfo) { const filePath = 'README.md'; if (initialRepoInfo.type === 'user_slash_repo') { if (isVerbose) console.log(`Input '${initialRepoInfo.originalIdentifier}' is 'username/repository' shorthand.`); if (isVerbose) console.log("Attempting to resolve on GitHub (github.com)..."); const githubInfo = { type: 'github', host: 'github.com', user: initialRepoInfo.user, repoName: initialRepoInfo.repoName, originalIdentifier: initialRepoInfo.originalIdentifier }; let result = await tryFetchForProvider(githubInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: githubInfo }; } console.warn(`GitHub attempt for '${initialRepoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); if (isVerbose) console.log("Attempting to resolve on GitLab (gitlab.com)..."); const gitlabInfo = { type: 'gitlab', host: 'gitlab.com', userOrGroupPath: initialRepoInfo.user, repoName: initialRepoInfo.repoName, originalIdentifier: initialRepoInfo.originalIdentifier }; result = await tryFetchForProvider(gitlabInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: gitlabInfo }; } console.warn(`GitLab.com attempt for '${initialRepoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); throw new Error(`Could not resolve '${initialRepoInfo.originalIdentifier}' on GitHub or GitLab.com, or ${filePath} not found on any tried branch.`); } else { const result = await tryFetchForProvider(initialRepoInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: initialRepoInfo }; } throw result.error || new Error(`Could not find ${filePath} for '${initialRepoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`); } }
 async function getLocalGitRepoInfo() { try { const gitConfigPath = path.join(process.cwd(), '.git', 'config'); const configContent = await fs.readFile(gitConfigPath, 'utf-8'); const originUrlMatch = configContent.match(/\[remote\s+"origin"\]\s*[^\[]*?\s*url\s*=\s*([^\s]+)/); if (originUrlMatch && originUrlMatch[1]) { let url = originUrlMatch[1]; url = url.replace(/^git@([^:]+):(.+?)(\.git)?$/, 'https://$1/$2'); if (url.endsWith('.git')) url = url.substring(0, url.length - 4); if (url.startsWith('http://')) url = 'https://' + url.substring(7); if (!url.startsWith('https://')) { if (isVerbose) console.log(`Info: Non-standard remote URL found in .git/config: ${originUrlMatch[1]}`); return null; } let displayName = url; try { const parsedUrl = new URL(url); const pathParts = parsedUrl.pathname.split('/').filter(Boolean); if (pathParts.length >= 2) displayName = `${pathParts[pathParts.length - 2]}/${pathParts[pathParts.length - 1]}`; else if (pathParts.length === 1) displayName = pathParts[0]; } catch (e) { /* Use full URL as displayName if parsing path fails */ } return { url: url, name: displayName }; } } catch (e) { if (isVerbose) console.log(`Info: Could not determine local git repository URL from .git/config. (${e.message})`); } return null; }
@@ -96,28 +109,30 @@ async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogI
         if (isVerbose) console.log(`Including Google Analytics script for ID: ${gaPropertyId}`);
     }
     
-    let footerRepoSourceHtmlForDisplay = '';
-    let consoleFooterRepoSourceText = '';
-    let repoUrlForAttribution = footerLinkHref || ogUrlToUse || "Source repository not specified or detected.";
+    // Prepare attribution strings
+    let repoUrlForAttributionText = "Source repository not specified or detected.";
+    let displayPathForAttribution = "N/A"; // For console/comment cleaner display
+    const attributionUrlSource = footerLinkHref || ogUrlToUse; 
 
-
-    if (footerLinkHref && footerLinkText) {
-        footerRepoSourceHtmlForDisplay = ` from <a href="${footerLinkHref}" target="_blank" rel="noopener noreferrer">${footerLinkText}</a>`;
-        const safeConsoleText = footerLinkText.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        const safeConsoleHref = footerLinkHref.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        consoleFooterRepoSourceText = ` from '${safeConsoleText}' (${safeConsoleHref})`;
-        repoUrlForAttribution = footerLinkHref; // Prefer more specific link for attribution
-    } else if (footerLinkText) { // Only text, no explicit URL (might happen for some local cases or if link construction failed)
-        footerRepoSourceHtmlForDisplay = ` from ${footerLinkText}`;
-        const safeConsoleText = footerLinkText.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        consoleFooterRepoSourceText = ` from '${safeConsoleText}'`;
-        repoUrlForAttribution = footerLinkText; // Use text as is if no URL
-    } else if (ogUrlToUse) { // Fallback to og:url for attribution if footer links not available
-         repoUrlForAttribution = ogUrlToUse;
+    if (attributionUrlSource) { // This URL should already be sanitized
+        repoUrlForAttributionText = attributionUrlSource; 
+        try {
+            const urlObj = new URL(attributionUrlSource);
+            let pathName = urlObj.pathname.endsWith('.git') ? urlObj.pathname.slice(0, -4) : urlObj.pathname;
+            pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName; // Remove leading slash for display consistency
+            displayPathForAttribution = `${urlObj.hostname}/${pathName}`;
+        } catch (e) {
+            displayPathForAttribution = attributionUrlSource; 
+        }
     }
-
-
+    
     const topHtmlComment = ``;
+
+    // Escape backticks, backslashes for JS template literal in console.log
+    const safeConsoleRepoPath = displayPathForAttribution
+        .replace(/\\/g, '\\\\') 
+        .replace(/`/g, '\\`')   
+        .replace(/\$\{/g, '\\${'); 
 
     const browserConsoleLogScript = `<script>
   console.log(\`
@@ -126,10 +141,17 @@ Page generated by READMEsite
 https://readme.site/
 
 From the README.md file of the repository:
-${repoUrlForAttribution.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}
+${safeConsoleRepoPath}
 --------------------------------------------
   \`);
 </script>`;
+
+    let footerRepoSourceHtmlForDisplay = '';
+    if (footerLinkHref && footerLinkText) {
+        footerRepoSourceHtmlForDisplay = ` from <a href="${footerLinkHref}" target="_blank" rel="noopener noreferrer">${footerLinkText}</a>`;
+    } else if (footerLinkText) { // Should usually have href if text is present from remote/local git
+        footerRepoSourceHtmlForDisplay = ` from ${footerLinkText}`;
+    }
 
 
     const finalHtml = HTML_TEMPLATE
@@ -155,7 +177,7 @@ async function main() {
     let rawArgs = process.argv.slice(2);
     const verboseFlagIndexInMain = rawArgs.indexOf('--verbose');
     if (verboseFlagIndexInMain !== -1) {
-        if (!process.env.VERBOSE_READMESITE) process.env.VERBOSE_READMESITE = 'true';
+        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true';
         rawArgs.splice(verboseFlagIndexInMain, 1);
     }
     if (isVerbose && process.env.VERBOSE_READMESITE === 'true') { console.log("Verbose mode enabled.");}
@@ -204,16 +226,24 @@ async function main() {
 
             const localGitInfo = await getLocalGitRepoInfo();
             if (localGitInfo) {
-                ogUrlToUse = localGitInfo.url;
-                footerLinkHref = localGitInfo.url;
-                footerLinkText = localGitInfo.name; // This is user/repo or repo
-                if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${localGitInfo.url}`);
+                const sanitizedUrl = sanitizeUrlForPublicDisplay(localGitInfo.url);
+                ogUrlToUse = sanitizedUrl;
+                footerLinkHref = sanitizedUrl;
+                try {
+                    const parsedUrl = new URL(sanitizedUrl); // Use sanitized URL for display text derivation
+                    let pathName = parsedUrl.pathname.endsWith('.git') ? parsedUrl.pathname.slice(0, -4) : parsedUrl.pathname;
+                    pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName;
+                    footerLinkText = `${parsedUrl.hostname}/${pathName}`;
+                } catch(e) {footerLinkText = localGitInfo.name; } // Fallback to name from getLocalGitRepoInfo
+                if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${footerLinkHref}`);
             }
         } else { 
             const initialRepoInfo = await parseRepoIdentifier(repoIdentifierArg);
+            let potentialOgUrl = '';
             if (initialRepoInfo.originalIdentifier && (initialRepoInfo.originalIdentifier.startsWith('https://') || initialRepoInfo.originalIdentifier.startsWith('http://'))) {
-                 try { new URL(initialRepoInfo.originalIdentifier); ogUrlToUse = initialRepoInfo.originalIdentifier; } catch(e) {/*ignore bad original id for og url*/}
+                 try { new URL(initialRepoInfo.originalIdentifier); potentialOgUrl = initialRepoInfo.originalIdentifier; } catch(e) {/*ignore*/}
             }
+            ogUrlToUse = sanitizeUrlForPublicDisplay(potentialOgUrl);
             
             let logIdentifier = initialRepoInfo.originalIdentifier;
             if (initialRepoInfo.type === 'user_slash_repo') { logIdentifier = `${initialRepoInfo.user}/${initialRepoInfo.repoName}`; }
@@ -227,13 +257,20 @@ async function main() {
 
             pageTitle = extractFirstH1(readmeContent) || actualSourceRepoInfo.repoName;
             if (isVerbose) console.log(`Determined page title (remote): "${pageTitle}"`);
-
-            // Construct footer link and text for remote mode
-            if (actualSourceRepoInfo.type === 'github') { footerLinkHref = `https://github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; footerLinkText = `github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; }
-            else if (actualSourceRepoInfo.type === 'gitlab') { footerLinkHref = `https://gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; footerLinkText = `gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; }
-            else if (actualSourceRepoInfo.type === 'unknown_gitlab_like') { footerLinkHref = `https://${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; footerLinkText = `${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; }
             
+            let rawLinkUrl = '';
+            if (actualSourceRepoInfo.type === 'github') { rawLinkUrl = `https://github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; footerLinkText = `github.com/${actualSourceRepoInfo.user}/${actualSourceRepoInfo.repoName}`; }
+            else if (actualSourceRepoInfo.type === 'gitlab') { rawLinkUrl = `https://gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; footerLinkText = `gitlab.com/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; }
+            else if (actualSourceRepoInfo.type === 'unknown_gitlab_like') { rawLinkUrl = `https://${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; footerLinkText = `${actualSourceRepoInfo.host}/${actualSourceRepoInfo.userOrGroupPath}/${actualSourceRepoInfo.repoName}`; }
+            
+            footerLinkHref = sanitizeUrlForPublicDisplay(rawLinkUrl);
             if (!ogUrlToUse && footerLinkHref) ogUrlToUse = footerLinkHref; 
+            else if (!ogUrlToUse && rawLinkUrl) ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl);
+
+
+            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) {
+                footerLinkText = sanitizeUrlForPublicDisplay(actualSourceRepoInfo.originalIdentifier);
+            }
         }
         
         if (isVerbose && imageUrlArg) console.log(`Custom image for social previews: ${imageUrlArg}`);
