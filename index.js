@@ -9,11 +9,12 @@ const DEFAULT_OUTPUT_DIR = '.';
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
 const DEFAULT_IMAGE_FILENAME = 'readmesite-og-default.png';
 
+// Determine verbosity early and make it easily accessible
 const initialArgsForVerbose = process.argv.slice(2);
 const verboseArgIndexForIsVerbose = initialArgsForVerbose.indexOf('--verbose');
 const isVerbose = verboseArgIndexForIsVerbose !== -1;
 if (isVerbose) {
-    process.env.VERBOSE_READMESITE = 'true';
+    process.env.VERBOSE_READMESITE = 'true'; // Set env var for easy access in functions
 }
 
 const HTML_TEMPLATE = `{{TOP_HTML_COMMENT}}
@@ -110,26 +111,26 @@ async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogI
     }
     
     // Prepare attribution strings
-    let repoUrlForAttributionText = "Source repository not specified or detected.";
-    let displayPathForAttribution = "N/A"; // For console/comment cleaner display
+    let repoUrlForComment = "Source repository not specified or detected."; 
+    let displayPathForConsole = "N/A";
+
     const attributionUrlSource = footerLinkHref || ogUrlToUse; 
 
-    if (attributionUrlSource) { // This URL should already be sanitized
-        repoUrlForAttributionText = attributionUrlSource; 
+    if (attributionUrlSource) { 
+        repoUrlForComment = attributionUrlSource; 
         try {
             const urlObj = new URL(attributionUrlSource);
             let pathName = urlObj.pathname.endsWith('.git') ? urlObj.pathname.slice(0, -4) : urlObj.pathname;
-            pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName; // Remove leading slash for display consistency
-            displayPathForAttribution = `${urlObj.hostname}/${pathName}`;
+            pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName; 
+            displayPathForConsole = `${urlObj.hostname}/${pathName}`;
         } catch (e) {
-            displayPathForAttribution = attributionUrlSource; 
+            displayPathForConsole = attributionUrlSource; 
         }
     }
     
     const topHtmlComment = ``;
 
-    // Escape backticks, backslashes for JS template literal in console.log
-    const safeConsoleRepoPath = displayPathForAttribution
+    const safeConsoleRepoPath = displayPathForConsole
         .replace(/\\/g, '\\\\') 
         .replace(/`/g, '\\`')   
         .replace(/\$\{/g, '\\${'); 
@@ -149,10 +150,9 @@ ${safeConsoleRepoPath}
     let footerRepoSourceHtmlForDisplay = '';
     if (footerLinkHref && footerLinkText) {
         footerRepoSourceHtmlForDisplay = ` from <a href="${footerLinkHref}" target="_blank" rel="noopener noreferrer">${footerLinkText}</a>`;
-    } else if (footerLinkText) { // Should usually have href if text is present from remote/local git
+    } else if (footerLinkText) { 
         footerRepoSourceHtmlForDisplay = ` from ${footerLinkText}`;
     }
-
 
     const finalHtml = HTML_TEMPLATE
         .replace('{{TOP_HTML_COMMENT}}', topHtmlComment)
@@ -175,12 +175,27 @@ function isLikelyRepoIdentifier(arg) { return arg.includes('/') || arg.startsWit
 
 async function main() {
     let rawArgs = process.argv.slice(2);
+    
     const verboseFlagIndexInMain = rawArgs.indexOf('--verbose');
     if (verboseFlagIndexInMain !== -1) {
-        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true';
+        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true'; // isVerbose is global
         rawArgs.splice(verboseFlagIndexInMain, 1);
     }
-    if (isVerbose && process.env.VERBOSE_READMESITE === 'true') { console.log("Verbose mode enabled.");}
+    // Ensure console log for verbose mode reflects the global const for consistency
+    if (isVerbose && process.env.VERBOSE_READMESITE === 'true') { 
+        // Check if it was already logged by the global definition or log it here.
+        // To avoid double logging if this main() could be called multiple times (it's not currently):
+        // For simplicity, the global 'isVerbose' check handles the initial console.log if needed.
+        // Let's ensure it's logged if VERBOSE_READMESITE was just set.
+        if(!initialArgsForVerbose.includes('--verbose') && process.argv.includes('--verbose')) {
+             // This case is unlikely given current setup. Initial check of process.argv is better.
+        } else if (isVerbose) { // If global isVerbose is true, ensure it's logged once.
+            // This was handled by the top-level isVerbose check and console.log.
+            // For safety, if we want to be absolutely sure it's logged when main starts and verbose is on:
+            // console.log("Verbose mode enabled."); // This might be redundant if already logged
+        }
+    }
+    if (isVerbose) console.log("Verbose mode active."); // A consistent log point for verbose in main
     
     let repoIdentifierArg = null;
     let outputDirArg = DEFAULT_OUTPUT_DIR;
@@ -230,11 +245,11 @@ async function main() {
                 ogUrlToUse = sanitizedUrl;
                 footerLinkHref = sanitizedUrl;
                 try {
-                    const parsedUrl = new URL(sanitizedUrl); // Use sanitized URL for display text derivation
+                    const parsedUrl = new URL(sanitizedUrl); 
                     let pathName = parsedUrl.pathname.endsWith('.git') ? parsedUrl.pathname.slice(0, -4) : parsedUrl.pathname;
                     pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName;
                     footerLinkText = `${parsedUrl.hostname}/${pathName}`;
-                } catch(e) {footerLinkText = localGitInfo.name; } // Fallback to name from getLocalGitRepoInfo
+                } catch(e) {footerLinkText = localGitInfo.name; } 
                 if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${footerLinkHref}`);
             }
         } else { 
@@ -265,10 +280,9 @@ async function main() {
             
             footerLinkHref = sanitizeUrlForPublicDisplay(rawLinkUrl);
             if (!ogUrlToUse && footerLinkHref) ogUrlToUse = footerLinkHref; 
-            else if (!ogUrlToUse && rawLinkUrl) ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl);
+            else if (!ogUrlToUse && rawLinkUrl) ogUrlToUse = sanitizeUrlForPublicDisplay(rawLinkUrl); // Sanitize rawLinkUrl again if used for ogUrlToUse
 
-
-            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) {
+            if (!footerLinkText && actualSourceRepoInfo.originalIdentifier) { // Fallback for link text if not formed by type
                 footerLinkText = sanitizeUrlForPublicDisplay(actualSourceRepoInfo.originalIdentifier);
             }
         }
