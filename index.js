@@ -9,8 +9,7 @@ const DEFAULT_OUTPUT_DIR = '.';
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
 const DEFAULT_IMAGE_FILENAME = 'readmesite-og-default.png';
 const THEME_STORE_BASE_URL = 'https://store.readme.site';
-const LOCAL_CSS_FILE = 'readmesite.css';
-const LOCAL_HTML_FILE = 'readmesite.html';
+const LOCAL_THEMES_DIR = '.';
 
 const initialArgsForVerbose = process.argv.slice(2);
 const verboseArgIndexForIsVerbose = initialArgsForVerbose.indexOf('--verbose');
@@ -37,7 +36,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     <meta name="twitter:title" content="{{PAGE_TITLE}}">
     <meta name="twitter:description" content="View the README for the {{PAGE_TITLE}} repository.">
     <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" id="readmesite-theme-stylesheet">
     <link rel="icon" href="{{FAVICON_URL}}" type="image/png">
 </head>
 <body>
@@ -56,14 +55,14 @@ const CSS_STYLES = `body {font-family: -apple-system, BlinkMacSystemFont, "Segoe
 
 function sanitizeUrlForPublicDisplay(urlString) {
     if (!urlString || typeof urlString !== 'string' || (!urlString.startsWith('http:') && !urlString.startsWith('https://'))) {
-        return urlString; 
+        return urlString;
     }
     try {
         const urlObj = new URL(urlString);
         return `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? ':' + urlObj.port : ''}${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
     } catch (e) {
         if (isVerbose) console.warn(`Warning: Could not sanitize URL '${urlString}': ${e.message}`);
-        return urlString; 
+        return urlString;
     }
 }
 
@@ -74,12 +73,7 @@ async function tryFetchForProvider(providerRepoInfo, branches, filePath) { let l
 async function fetchReadmeContent(initialRepoInfo) { const filePath = 'README.md'; if (initialRepoInfo.type === 'user_slash_repo') { if (isVerbose) console.log(`Input '${initialRepoInfo.originalIdentifier}' is 'username/repository' shorthand.`); if (isVerbose) console.log("Attempting to resolve on GitHub (github.com)..."); const githubInfo = { type: 'github', host: 'github.com', user: initialRepoInfo.user, repoName: initialRepoInfo.repoName, originalIdentifier: initialRepoInfo.originalIdentifier }; let result = await tryFetchForProvider(githubInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: githubInfo }; } console.warn(`GitHub attempt for '${initialRepoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); if (isVerbose) console.log("Attempting to resolve on GitLab (gitlab.com)..."); const gitlabInfo = { type: 'gitlab', host: 'gitlab.com', userOrGroupPath: initialRepoInfo.user, repoName: initialRepoInfo.repoName, originalIdentifier: initialRepoInfo.originalIdentifier }; result = await tryFetchForProvider(gitlabInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: gitlabInfo }; } console.warn(`GitLab.com attempt for '${initialRepoInfo.originalIdentifier}' failed or README not found: ${result.error ? result.error.message : "README not found"}`); throw new Error(`Could not resolve '${initialRepoInfo.originalIdentifier}' on GitHub or GitLab.com, or ${filePath} not found on any tried branch.`); } else { const result = await tryFetchForProvider(initialRepoInfo, CHECK_BRANCHES_ORDER, filePath); if (result.content) { return { readmeContent: result.content, actualSourceRepoInfo: initialRepoInfo }; } throw result.error || new Error(`Could not find ${filePath} for '${initialRepoInfo.originalIdentifier}' on any of the branches: ${CHECK_BRANCHES_ORDER.join(', ')}.`); } }
 async function getLocalGitRepoInfo() { try { const gitConfigPath = path.join(process.cwd(), '.git', 'config'); const configContent = await fs.readFile(gitConfigPath, 'utf-8'); const originUrlMatch = configContent.match(/\[remote\s+"origin"\]\s*[^\[]*?\s*url\s*=\s*([^\s]+)/); if (originUrlMatch && originUrlMatch[1]) { let url = originUrlMatch[1]; url = url.replace(/^git@([^:]+):(.+?)(\.git)?$/, 'https://$1/$2'); if (url.endsWith('.git')) url = url.substring(0, url.length - 4); if (url.startsWith('http://')) url = 'https://' + url.substring(7); if (!url.startsWith('https://')) { if (isVerbose) console.log(`Info: Non-standard remote URL found in .git/config: ${originUrlMatch[1]}`); return null; } let displayName = url; try { const parsedUrl = new URL(url); const pathParts = parsedUrl.pathname.split('/').filter(Boolean); if (pathParts.length >= 2) displayName = `${pathParts[pathParts.length - 2]}/${pathParts[pathParts.length - 1]}`; else if (pathParts.length === 1) displayName = pathParts[0]; } catch (e) { /* Use full URL as displayName if parsing path fails */ } return { url: url, name: displayName }; } } catch (e) { if (isVerbose) console.log(`Info: Could not determine local git repository URL from .git/config. (${e.message})`); } return null; }
 
-/**
- * Fetches content from a URL or reads it from a local file path.
- * @param {string | null} pathOrUrl - The local file path or the URL to fetch.
- * @returns {Promise<string | null>} The content as a string, or null if an error occurs.
- */
-async function fetchOrReadContent(pathOrUrl) {
+async function fetchOrReadContent(pathOrUrl, isThemeAsset = false) {
     if (!pathOrUrl) return null;
     const isUrl = pathOrUrl.startsWith('http:') || pathOrUrl.startsWith('https://');
     if (isVerbose) console.log(`Getting content from ${isUrl ? 'URL' : 'path'}: ${pathOrUrl}`);
@@ -87,6 +81,11 @@ async function fetchOrReadContent(pathOrUrl) {
         if (isUrl) {
             const response = await fetch(pathOrUrl);
             if (!response.ok) {
+                if (isThemeAsset && response.status === 404) {
+                     // Don't throw, just return null so we know it's specifically a theme asset 404
+                    if (isVerbose) console.warn(`Theme asset not found at URL: ${pathOrUrl}`);
+                    return null;
+                }
                 throw new Error(`Failed to fetch ${pathOrUrl}. Status: ${response.status} ${response.statusText}`);
             }
             return await response.text();
@@ -94,55 +93,20 @@ async function fetchOrReadContent(pathOrUrl) {
             return await fs.readFile(pathOrUrl, 'utf-8');
         }
     } catch (e) {
-        console.warn(`Warning: Could not fetch or read content from '${pathOrUrl}': ${e.message}`);
-        return null;
-    }
-}
-
-/**
- * Resolves a theme identifier to CSS and HTML URLs.
- * @param {string} themeIdentifier - The name (e.g., 'bones', '@user/theme') or URL of the theme.
- * @returns {Promise<{cssUrl: string | null, htmlUrl: string | null}>} An object containing CSS and HTML URLs.
- */
-async function resolveThemeUrls(themeIdentifier) {
-    if (!themeIdentifier) return { cssUrl: null, htmlUrl: null };
-
-    let themeJsonUrl;
-    if (themeIdentifier.startsWith('http:') || themeIdentifier.startsWith('https://')) {
-        themeJsonUrl = themeIdentifier.endsWith('/') ? `${themeIdentifier}theme.json` : (themeIdentifier.endsWith('/theme.json') ? themeIdentifier : `${themeIdentifier}/theme.json`);
-    } else {
-         // Handle simple names and @user/theme names
-        themeJsonUrl = `${THEME_STORE_BASE_URL}/${themeIdentifier}/theme.json`;
-    }
-
-    if (isVerbose) console.log(`Resolving theme: ${themeIdentifier} via ${themeJsonUrl}`);
-
-    try {
-        const response = await fetch(themeJsonUrl);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch theme.json from ${themeJsonUrl}. Status: ${response.status} ${response.statusText}`);
+        // For theme assets, a failure to fetch/read often means it doesn't exist (which can be valid, e.g. optional HTML)
+        // So, don't necessarily throw an error that stops the program unless it's not a theme asset.
+        if (isThemeAsset) {
+            if (isVerbose) console.warn(`Could not fetch or read theme asset from '${pathOrUrl}': ${e.message}`);
+            return null;
         }
-        const themeConfig = await response.json();
-        if (!themeConfig || (!themeConfig.css && !themeConfig.html)) {
-            throw new Error(`Invalid theme.json structure at ${themeJsonUrl}. Expected 'css' and/or 'html' keys.`);
-        }
-
-        const themeBaseUrl = themeJsonUrl.substring(0, themeJsonUrl.lastIndexOf('/'));
-
-        const cssUrl = themeConfig.css ? (themeConfig.css.startsWith('http') ? themeConfig.css : `${themeBaseUrl}/${themeConfig.css}`) : null;
-        const htmlUrl = themeConfig.html ? (themeConfig.html.startsWith('http') ? themeConfig.html : `${themeBaseUrl}/${themeConfig.html}`) : null;
-
-        if (isVerbose) console.log(`Theme resolved: CSS='${cssUrl || 'N/A'}', HTML='${htmlUrl || 'N/A'}'`);
-        return { cssUrl, htmlUrl };
-
-    } catch (e) {
-        console.warn(`Warning: Could not resolve or fetch theme '${themeIdentifier}': ${e.message}`);
-        return { cssUrl: null, htmlUrl: null };
+        // For non-theme assets (like main README), throw to indicate a more critical failure.
+        throw new Error(`Could not fetch or read content from '${pathOrUrl}': ${e.message}`);
     }
 }
 
 
-async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogImageUrlCli, footerLinkHref, footerLinkText, gaPropertyId, customCssContent, customHtmlTemplate) {
+async function generateSite(readmeContent, pageTitle, outputDir, ogUrlToUse, ogImageUrlCli, footerLinkHref, footerLinkText, gaPropertyId, 
+                            customCssContent, customHtmlTemplate, resolvedThemeCssFilename) {
     if (isVerbose) console.log(`Generating site for "${pageTitle}" in directory: ${outputDir}`);
     try { await fs.mkdir(outputDir, { recursive: true }); }
     catch (error) { throw new Error(`Failed to create output directory '${outputDir}': ${error.message}`); }
@@ -223,8 +187,37 @@ ${safeConsoleRepoPath}
         footerRepoSourceHtmlForDisplay = ` from ${footerLinkText}`;
     }
 
-    const finalHtmlTemplateToUse = customHtmlTemplate || HTML_TEMPLATE;
-    const finalCssContentToUse = customCssContent || CSS_STYLES;
+    let finalHtmlTemplateToUse = customHtmlTemplate || HTML_TEMPLATE;
+    const finalCssContentToUse = customCssContent || CSS_STYLES; // Use custom CSS if provided, else default
+    const cssFileToWrite = resolvedThemeCssFilename || 'style.css'; // Name for the CSS file
+
+    // Modify the HTML template to link to the correct CSS file
+    if (resolvedThemeCssFilename) {
+        // Regex to find <link rel="stylesheet" href="ANYTHING_HERE_OR_DEFAULT_STYLE.CSS" ...> and replace href
+        // It's a bit basic but should work for the default template and simple custom ones.
+        // It looks for id="readmesite-theme-stylesheet" or href="style.css" as fallback.
+        const linkRegex = /<link\s+[^>]*?rel="stylesheet"[^>]*?(?:id="readmesite-theme-stylesheet"|href="style\.css")[^>]*?>/i;
+        if (finalHtmlTemplateToUse.match(linkRegex)) {
+            finalHtmlTemplateToUse = finalHtmlTemplateToUse.replace(
+                linkRegex,
+                `<link rel="stylesheet" href="${cssFileToWrite}" id="readmesite-theme-stylesheet">`
+            );
+        } else {
+            // If no specific link found, prepend the new link. This is a fallback.
+            finalHtmlTemplateToUse = finalHtmlTemplateToUse.replace(
+                /(<\/head>)/i,
+                `    <link rel="stylesheet" href="${cssFileToWrite}" id="readmesite-theme-stylesheet">\n$1`
+            );
+            if (isVerbose) console.log(`Info: No designated theme stylesheet link found; prepended link for ${cssFileToWrite}.`);
+        }
+    } else if (!customHtmlTemplate) { 
+        // If no theme CSS and no custom HTML, ensure default HTML links to default style.css
+        finalHtmlTemplateToUse = HTML_TEMPLATE.replace(
+            /<link rel="stylesheet" href="style\.css"[^>]*?>/i, // Ensure we target the default link correctly
+            `<link rel="stylesheet" href="style.css" id="readmesite-theme-stylesheet">`
+        );
+    }
+
 
     const finalHtml = finalHtmlTemplateToUse
         .replace(/{{PAGE_TITLE}}/g, pageTitle)
@@ -238,31 +231,32 @@ ${safeConsoleRepoPath}
 
     try { await fs.writeFile(path.join(outputDir, 'index.html'), finalHtml); if (isVerbose) console.log(`Successfully wrote index.html`); }
     catch (error) { throw new Error(`Failed to write index.html: ${error.message}`); }
-    try { await fs.writeFile(path.join(outputDir, 'style.css'), finalCssContentToUse); if (isVerbose) console.log(`Successfully wrote style.css`); }
-    catch (error) { throw new Error(`Failed to write style.css: ${error.message}`); }
+    
+    // Write the chosen CSS content to the determined CSS filename
+    try { await fs.writeFile(path.join(outputDir, cssFileToWrite), finalCssContentToUse); if (isVerbose) console.log(`Successfully wrote ${cssFileToWrite}`); }
+    catch (error) { throw new Error(`Failed to write ${cssFileToWrite}: ${error.message}`); }
 }
 
 function isLikelyRepoIdentifier(arg) { return arg.includes('/') || arg.startsWith('http:') || arg.startsWith('https://'); }
+function isUrl(str) { return str.startsWith('http:') || str.startsWith('https://'); }
 
 async function main() {
     let rawArgs = process.argv.slice(2);
     
-    const verboseFlagIndexInMain = rawArgs.indexOf('--verbose');
-    if (verboseFlagIndexInMain !== -1) {
-        if (!process.env.VERBOSE_READMESITE && isVerbose) process.env.VERBOSE_READMESITE = 'true';
-        rawArgs.splice(verboseFlagIndexInMain, 1);
-    }
-    if (isVerbose && process.env.VERBOSE_READMESITE === 'true') { 
-        console.log("Verbose mode enabled.");
+    if (rawArgs.includes('--verbose')) {
+        if (!process.env.VERBOSE_READMESITE) process.env.VERBOSE_READMESITE = 'true';
+        rawArgs = rawArgs.filter(arg => arg !== '--verbose');
+        if (isVerbose) console.log("Verbose mode enabled.");
     }
     
     let repoIdentifierArg = null;
     let outputDirArg = DEFAULT_OUTPUT_DIR;
     let imageUrlArg = null;
     let gaPropertyIdArg = null;
-    let cssArg = null;
-    let htmlArg = null;
     let themeArg = null;
+    let paletteArg = null;
+    // Removed cssArg & htmlArg as they are now superseded by the new theme system
+
     let localMode = false;
     const localReadmePath = 'README.md';
     const remainingArgs = [];
@@ -275,16 +269,14 @@ async function main() {
         } else if (arg === '--ga') {
             if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('--')) { gaPropertyIdArg = rawArgs[++i]; }
             else { console.warn("Warning: --ga flag needs an ID. Ignoring."); }
-        } else if (arg === '--css') {
-            if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('--')) { cssArg = rawArgs[++i]; }
-            else { console.warn("Warning: --css flag needs path/URL. Ignoring."); }
-        } else if (arg === '--html') {
-            if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('--')) { htmlArg = rawArgs[++i]; }
-            else { console.warn("Warning: --html flag needs path/URL. Ignoring."); }
         } else if (arg === '--theme') {
             if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('--')) { themeArg = rawArgs[++i]; }
-            else { console.warn("Warning: --theme flag needs name/URL. Ignoring."); }
-        } else {
+            else { console.warn("Warning: --theme flag needs a name/URL. Ignoring."); }
+        } else if (arg === '--palette') {
+            if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith('--')) { paletteArg = rawArgs[++i]; }
+            else { console.warn("Warning: --palette flag needs a name. Ignoring.");}
+        }
+         else {
             remainingArgs.push(arg);
         }
     }
@@ -294,18 +286,20 @@ async function main() {
     else if (rawArgs.length === 1) { if (isLikelyRepoIdentifier(rawArgs[0])) { repoIdentifierArg = rawArgs[0]; } else { localMode = true; outputDirArg = rawArgs[0]; } }
     else { repoIdentifierArg = rawArgs[0]; outputDirArg = rawArgs[1]; }
 
-    if (!localMode && !repoIdentifierArg) {
+    if (!localMode && !repoIdentifierArg && !themeArg) { // Allow running with just --theme for local
         console.error("Error: Operation could not be determined. Please provide a repository identifier or run with no identifier for local mode.\n");
-        console.log("Usage for remote repository:"); console.log("  readmesite <repository_identifier> [output_directory] [options]\n");
-        console.log("Usage for local README.md (in current directory):"); console.log("  readmesite [output_directory] [options]\n");
+        console.log("Usage for remote repository:"); 
+        console.log("  readmesite <repository_identifier> [output_directory] [options]\n");
+        console.log("Usage for local README.md (in current directory):"); 
+        console.log("  readmesite [output_directory] [options]\n");
+        console.log("Applying a theme to local README.md:");
+        console.log("  readmesite --theme <theme_name_or_url> [output_directory] [options]\n")
         console.log("If no arguments are given, it processes ./README.md into the current directory ('.').\n");
         console.log("Options:"); 
         console.log("  --image <image_url>      URL for social media preview image."); 
         console.log("  --ga <GA_ID>             Google Analytics Property ID (e.g., G-XXXXXXXXXX).");
-        console.log("  --css <path_or_url>      Path or URL to a custom CSS file.");
-        console.log("  --html <path_or_url>     Path or URL to a custom HTML template file.");
-        console.log("  --theme <name_or_url>    Name/URL of a theme (provides CSS & HTML).");
-        console.log("                           (See https://store.readme.site for themes).");
+        console.log("  --theme <name_or_url>    Name or URL of a theme. If URL, must point to base CSS file of theme.");
+        console.log("  --palette <palette_name> Optional palette for the theme (e.g., 'ocean' for 'themename-ocean.css').");
         console.log("  --verbose                Enable verbose logging."); 
         process.exit(1);
     }
@@ -318,41 +312,135 @@ async function main() {
         let footerLinkHref = null; 
         let footerLinkText = null; 
 
-        let cssSource = cssArg;
-        let htmlSource = htmlArg;
+        let customCssContent = null;
+        let customHtmlTemplate = null;
+        let resolvedThemeCssFilename = null;
 
-        // 1. Resolve theme (if specified) and set base sources
         if (themeArg) {
-            const themeUrls = await resolveThemeUrls(themeArg);
-            cssSource = cssSource || themeUrls.cssUrl; // Flags override theme
-            htmlSource = htmlSource || themeUrls.htmlUrl; // Flags override theme
+            if (isVerbose) console.log(`Attempting to apply theme: ${themeArg}${paletteArg ? ` (Palette: ${paletteArg})` : ''}`);
+            
+            let resolvedThemeName = themeArg;
+            if (paletteArg) {
+                resolvedThemeName = `${themeArg}-${paletteArg}`;
+            }
+
+            let cssUrlOrPath;
+            let htmlUrlOrPath;
+
+            if (isUrl(themeArg)) { // Assuming themeArg is a URL to the base CSS file or a base theme identifier URL
+                let baseThemeUrl = themeArg;
+                // If themeArg is a full URL to a CSS file, derive base URL for other assets
+                if (themeArg.endsWith('.css')) {
+                    baseThemeUrl = themeArg.substring(0, themeArg.lastIndexOf('/') + 1);
+                } else if (!themeArg.endsWith('/')) {
+                    baseThemeUrl += '/';
+                }
+                
+                if (paletteArg) {
+                    // If themeArg was specific e.g. "mytheme" and palette "blue", construct "mytheme-blue.css"
+                    // If themeArg was a URL e.g. "http://.../mytheme/" and palette "blue", construct "http://.../mytheme/mytheme-blue.css"
+                    // This logic assumes themeArg does not already include a palette if paletteArg is also given.
+                    // For simplicity, if themeArg is a URL, we assume it's a base path for the theme.
+                    let themeFilenameBase = themeArg.includes('/') ? themeArg.substring(themeArg.lastIndexOf('/') + 1) : themeArg;
+                    if (themeFilenameBase.endsWith('.css')) themeFilenameBase = themeFilenameBase.slice(0, -4);
+
+                    resolvedThemeName = paletteArg ? `${themeFilenameBase}-${paletteArg}` : themeFilenameBase;
+                    
+                    // If themeArg was a full URL to a specific CSS, this logic is tricky.
+                    // Let's assume if themeArg is a URL, it's a base path for the theme store, e.g. THEME_STORE_BASE_URL
+                    // And the theme name is the actual filename base.
+                    // This part needs to be robust depending on how themeArg (URL) and paletteArg are combined.
+
+                    // Simpler: If themeArg is a URL, it's the base path. resolvedThemeName is the filename stem.
+                     if (isUrl(themeArg)) { // Full URL like store.readme.site/darkmode
+                        const tempUrl = new URL(themeArg.endsWith('/') ? themeArg : themeArg + '/'); // Ensure it's a directory
+                        const baseNameFromUrl = tempUrl.pathname.split('/').filter(Boolean).pop() || themeArg; // last part of path
+                        resolvedThemeName = paletteArg ? `${baseNameFromUrl}-${paletteArg}` : baseNameFromUrl;
+                        cssUrlOrPath = `${tempUrl.href}${resolvedThemeName}.css`;
+                        htmlUrlOrPath = `${tempUrl.href}${resolvedThemeName}.html`;
+                    } else { // themeArg is a name like 'darkmode'
+                        resolvedThemeName = paletteArg ? `${themeArg}-${paletteArg}` : themeArg;
+                        // Check theme store first, then local
+                         cssUrlOrPath = `${THEME_STORE_BASE_URL}/${resolvedThemeName}.css`;
+                         customCssContent = await fetchOrReadContent(cssUrlOrPath, true);
+                         if (!customCssContent) { // Fallback to local
+                            if (isVerbose) console.log(`Theme CSS not found at ${cssUrlOrPath}, trying local: ${LOCAL_THEMES_DIR}/${resolvedThemeName}.css`);
+                            cssUrlOrPath = path.join(LOCAL_THEMES_DIR, `${resolvedThemeName}.css`);
+                         }
+                         htmlUrlOrPath = `${THEME_STORE_BASE_URL}/${resolvedThemeName}.html`;
+                         customHtmlTemplate = await fetchOrReadContent(htmlUrlOrPath, true);
+                         if (!customHtmlTemplate) {
+                             if (isVerbose) console.log(`Theme HTML not found at ${htmlUrlOrPath}, trying local: ${LOCAL_THEMES_DIR}/${resolvedThemeName}.html`);
+                            htmlUrlOrPath = path.join(LOCAL_THEMES_DIR, `${resolvedThemeName}.html`);
+                         }
+                    }
+
+                } else { // No palette, themeArg could be a name or full URL to CSS
+                    if (isUrl(themeArg)) {
+                        if (themeArg.endsWith('.css')) { // Full URL to CSS
+                            cssUrlOrPath = themeArg;
+                            resolvedThemeName = path.basename(themeArg, '.css');
+                            htmlUrlOrPath = themeArg.replace('.css', '.html');
+                        } else { // URL to a theme "directory" on a store
+                            const tempUrl = new URL(themeArg.endsWith('/') ? themeArg : themeArg + '/');
+                            resolvedThemeName = tempUrl.pathname.split('/').filter(Boolean).pop() || themeArg;
+                            cssUrlOrPath = `${tempUrl.href}${resolvedThemeName}.css`;
+                            htmlUrlOrPath = `${tempUrl.href}${resolvedThemeName}.html`;
+                        }
+                    } else { // Local theme name
+                        resolvedThemeName = themeArg;
+                        cssUrlOrPath = `${THEME_STORE_BASE_URL}/${resolvedThemeName}.css`;
+                        customCssContent = await fetchOrReadContent(cssUrlOrPath, true);
+                         if (!customCssContent) {
+                            if (isVerbose) console.log(`Theme CSS not found at ${cssUrlOrPath}, trying local: ${LOCAL_THEMES_DIR}/${resolvedThemeName}.css`);
+                            cssUrlOrPath = path.join(LOCAL_THEMES_DIR, `${resolvedThemeName}.css`);
+                         }
+                        htmlUrlOrPath = `${THEME_STORE_BASE_URL}/${resolvedThemeName}.html`;
+                         customHtmlTemplate = await fetchOrReadContent(htmlUrlOrPath, true);
+                         if (!customHtmlTemplate) {
+                            if (isVerbose) console.log(`Theme HTML not found at ${htmlUrlOrPath}, trying local: ${LOCAL_THEMES_DIR}/${resolvedThemeName}.html`);
+                            htmlUrlOrPath = path.join(LOCAL_THEMES_DIR, `${resolvedThemeName}.html`);
+                         }
+                    }
+                }
+            } else { // themeArg is a local name (not URL)
+                resolvedThemeName = paletteArg ? `${themeArg}-${paletteArg}` : themeArg;
+                cssUrlOrPath = path.join(LOCAL_THEMES_DIR, `${resolvedThemeName}.css`);
+                htmlUrlOrPath = path.join(LOCAL_THEMES_DIR, `${resolvedThemeName}.html`);
+            }
+
+
+            if (isVerbose) console.log(`Resolved theme name: ${resolvedThemeName}`);
+            if (isVerbose) console.log(`Attempting to fetch CSS from: ${cssUrlOrPath}`);
+            if (!customCssContent) customCssContent = await fetchOrReadContent(cssUrlOrPath, true);
+
+            if (!customCssContent) {
+                throw new Error(`Theme error: CSS file for theme '${resolvedThemeName}' not found at expected location: ${cssUrlOrPath}`);
+            }
+            resolvedThemeCssFilename = `${resolvedThemeName}.css`;
+
+            if (isVerbose) console.log(`Attempting to fetch HTML from: ${htmlUrlOrPath}`);
+            if(!customHtmlTemplate) customHtmlTemplate = await fetchOrReadContent(htmlUrlOrPath, true);
+            if (customHtmlTemplate && isVerbose) {
+                console.log(`Using custom HTML template for theme '${resolvedThemeName}'.`);
+            } else if (isVerbose) {
+                console.log(`No custom HTML template found for theme '${resolvedThemeName}', using default HTML structure.`);
+            }
         }
-
-        // 2. Check local files (if no flags or theme sources)
-        try {
-            if (!cssSource) {
-                await fs.access(LOCAL_CSS_FILE);
-                cssSource = LOCAL_CSS_FILE;
-                if (isVerbose) console.log(`Found local ${LOCAL_CSS_FILE}.`);
-            }
-        } catch (e) { /* File not found, ignore */ }
-        try {
-            if (!htmlSource) {
-                await fs.access(LOCAL_HTML_FILE);
-                htmlSource = LOCAL_HTML_FILE;
-                if (isVerbose) console.log(`Found local ${LOCAL_HTML_FILE}.`);
-            }
-        } catch (e) { /* File not found, ignore */ }
-
-        // 3. Fetch/Read CSS and HTML
-        const customCssContent = await fetchOrReadContent(cssSource);
-        const customHtmlTemplate = await fetchOrReadContent(htmlSource);
 
 
         if (localMode) {
-            console.log(`Processing local '${localReadmePath}' -> '${resolvedOutputDir}'`);
-            try { readmeContent = await fs.readFile(localReadmePath, 'utf-8'); }
-            catch (readError) { if (readError.code === 'ENOENT') { throw new Error(`Local mode error: '${localReadmePath}' not found in the current directory.`); } throw new Error(`Local mode error: Could not read '${localReadmePath}': ${readError.message}`); }
+            // If theme is also specified in localMode, readmeContent is still from local.
+            if (!repoIdentifierArg) { // Pure local mode or local with theme
+                 console.log(`Processing local '${localReadmePath}' -> '${resolvedOutputDir}'`);
+                 try { readmeContent = await fs.readFile(localReadmePath, 'utf-8'); }
+                 catch (readError) { if (readError.code === 'ENOENT') { throw new Error(`Local mode error: '${localReadmePath}' not found in the current directory.`); } throw new Error(`Local mode error: Could not read '${localReadmePath}': ${readError.message}`); }
+            } else {
+                // This case should not happen based on arg parsing logic.
+                // If repoIdentifierArg is set, localMode should be false.
+                // However, if we support `readmesite <repoId> --theme localtheme`,
+                // then localMode would be false. We are handling themes already.
+            }
             
             pageTitle = extractFirstH1(readmeContent);
             if (!pageTitle) { try { const pkgJsonPath = path.join(process.cwd(), 'package.json'); const pkgJsonContent = await fs.readFile(pkgJsonPath, 'utf-8'); const pkgJson = JSON.parse(pkgJsonContent); if (pkgJson && pkgJson.name) pageTitle = pkgJson.name; } catch (e) { /* ignore */ } }
@@ -372,7 +460,9 @@ async function main() {
                 } catch(e) {footerLinkText = localGitInfo.name; } 
                 if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${footerLinkHref}`);
             }
-        } else { // Remote mode
+        }
+        
+        if (!localMode && repoIdentifierArg) { // Remote mode
             const initialRepoInfo = await parseRepoIdentifier(repoIdentifierArg);
             let potentialOgUrl = '';
             if (initialRepoInfo.originalIdentifier && (initialRepoInfo.originalIdentifier.startsWith('https://') || initialRepoInfo.originalIdentifier.startsWith('http://'))) {
@@ -424,10 +514,39 @@ async function main() {
             }
         }
         
+        // If only --theme is provided, it implies local README.md
+        if (themeArg && !repoIdentifierArg && !localMode) {
+            localMode = true; // Set localMode if only theme is driving the operation
+             console.log(`Processing local '${localReadmePath}' with theme '${resolvedThemeName}' -> '${resolvedOutputDir}'`);
+             try { readmeContent = await fs.readFile(localReadmePath, 'utf-8'); }
+             catch (readError) { if (readError.code === 'ENOENT') { throw new Error(`Local mode error: '${localReadmePath}' not found in the current directory.`); } throw new Error(`Local mode error: Could not read '${localReadmePath}': ${readError.message}`); }
+            
+            pageTitle = extractFirstH1(readmeContent);
+            if (!pageTitle) { try { const pkgJsonPath = path.join(process.cwd(), 'package.json'); const pkgJsonContent = await fs.readFile(pkgJsonPath, 'utf-8'); const pkgJson = JSON.parse(pkgJsonContent); if (pkgJson && pkgJson.name) pageTitle = pkgJson.name; } catch (e) { /* ignore */ } }
+            if (!pageTitle) pageTitle = path.basename(process.cwd());
+            if (isVerbose) console.log(`Determined page title (local): "${pageTitle}"`);
+            // OG/footer links might still be relevant if .git/config exists locally
+            const localGitInfo = await getLocalGitRepoInfo();
+             if (localGitInfo) {
+                const sanitizedUrl = sanitizeUrlForPublicDisplay(localGitInfo.url);
+                ogUrlToUse = ogUrlToUse || sanitizedUrl; // Don't overwrite if already set by remote
+                footerLinkHref = footerLinkHref || sanitizedUrl;
+                 try {
+                    const parsedUrl = new URL(sanitizedUrl); 
+                    let pathName = parsedUrl.pathname.endsWith('.git') ? parsedUrl.pathname.slice(0, -4) : parsedUrl.pathname;
+                    pathName = pathName.startsWith('/') ? pathName.substring(1) : pathName;
+                    footerLinkText = footerLinkText || `${parsedUrl.hostname}/${pathName}`; 
+                } catch(e) { footerLinkText = footerLinkText || localGitInfo.name; } 
+                if (isVerbose) console.log(`Inferred source repository for footer/OG URL: ${footerLinkHref}`);
+            }
+        }
+        
         if (isVerbose && imageUrlArg) console.log(`Custom image for social previews: ${imageUrlArg}`);
         if (isVerbose && gaPropertyIdArg) console.log(`Google Analytics ID to be used: ${gaPropertyIdArg}`);
         
-        await generateSite(readmeContent, pageTitle, resolvedOutputDir, ogUrlToUse, imageUrlArg, footerLinkHref, footerLinkText, gaPropertyIdArg, customCssContent, customHtmlTemplate);
+        await generateSite(readmeContent, pageTitle, resolvedOutputDir, ogUrlToUse, imageUrlArg, 
+                            footerLinkHref, footerLinkText, gaPropertyIdArg, 
+                            customCssContent, customHtmlTemplate, resolvedThemeCssFilename);
 
         console.log(`\n✅ Site generation complete!`);
         console.log(`Static site files are located in: ${resolvedOutputDir}`);
