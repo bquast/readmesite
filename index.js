@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 const DEFAULT_OUTPUT_DIR = '.';
 const CHECK_BRANCHES_ORDER = ['master', 'main', 'gh-pages'];
 const DEFAULT_IMAGE_FILENAME = 'readmesite-og-default.png';
-const THEME_STORE_BASE_URL = 'https://store.readme.site';
+const THEME_STORE_BASE_URL = 'https://store.readme.site/themes';
 const LOCAL_THEMES_DIR = '.';
 
 const initialArgsForVerbose = process.argv.slice(2);
