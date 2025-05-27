@@ -109,7 +109,7 @@ async function generateSinglePage(markdownContent, pageTitle, outputDir, outputF
     else if (footerLinkText) { footerRepoHtml = ` from ${footerLinkText}`; }
     let extraLinksHtml = '';
     if (allMdFiles.length > 1) {
-        extraLinksHtml = '<div class="readmesite-extra-links"><p>Project Docs: ';
+        extraLinksHtml = '<div class="readmesite-extra-links"><p>';
         const links = allMdFiles.map(file => {
             const base = path.basename(file, '.md');
             const htmlFile = base.toLowerCase() === 'readme' ? 'index.html' : base + '.html';
