@@ -28,5 +28,15 @@ Themes can be set from local or remote CSS and HTML files, or directly from the 
 npm readmesite --theme darkmode
 ```
 
-For more info see the [themes page](/themes)
+For more info see the [themes page](/themes).
 
+
+## Google Analytics
+
+READMEsite can automaticall include the Google Analytics javascript snippet with the supplies GA property ID:
+
+```
+npx readmesite --ga G-EK4J8D3VHC
+```
+
+For more info see the [analytics page](/analytics).
