@@ -15,4 +15,4 @@ Themes consist of at least a CSS file of the form `[themename].css`, e.g. `darkm
 
 Themes can be added to the READMEsite Theme Store, by submitting a pull request to the Store repository
 
-<https://github.com/bquast/readmesite-store
+https://github.com/bquast/readmesite-store
