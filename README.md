@@ -33,7 +33,7 @@ For more info see the [themes page](/themes).
 
 ## Google Analytics
 
-READMEsite can automatically include the Google Analytics javascript snippet with the supplies GA property ID:
+READMEsite can automatically include the Google Analytics javascript snippet with the supplied property ID:
 
 ```
 npx readmesite --ga G-EK4J8D3VHC
