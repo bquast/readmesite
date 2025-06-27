@@ -22,7 +22,7 @@ By default it will be placed in the same directory (the project folder).
 
 ## Themes
 
-Themes can be set from local or remote CSS and HTML files, or directly from the [https://store.readme.file/](store):
+Themes can be set from local or remote CSS and HTML files, or directly from the [https://store.readme.site/](store):
 
 ```
 npm readmesite --theme darkmode
